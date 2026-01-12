@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      padding: 16px;
+      min-width: 300px;
+    }
+    h1 {
+      font-size: 16px;
+      margin: 0 0 16px 0;
+    }
+    label {
+      display: block;
+      margin-bottom: 12px;
+    }
+    span {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+    input {
+      width: 100%;
+      padding: 6px;
+      box-sizing: border-box;
+    }
+    input[type="color"] {
+      height: 36px;
+      cursor: pointer;
+    }
+    textarea {
+      width: 100%;
+      padding: 6px;
+      box-sizing: border-box;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    button {
+      background: #0060df;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin-top: 8px;
+    }
+    button:hover {
+      background: #003eaa;
+    }
+    .saved {
+      color: green;
+      margin-left: 8px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Battlefield Value Highlighter</h1>
+
+  <label>
+    <span>Threshold</span>
+    <input type="number" id="threshold" min="0" step="1000">
+  </label>
+
+  <label>
+    <span>Highlight Color</span>
+    <input type="color" id="highlightColor">
+  </label>
+
+  <label>
+    <span>Text Color</span>
+    <input type="color" id="textColor">
+  </label>
+
+  <label>
+    <span>XPath (advanced)</span>
+    <textarea id="xpath" rows="3"></textarea>
+  </label>
+
+  <button id="save">Save</button>
+  <span class="saved" id="savedMsg">✓ Saved! Refresh the page.</span>
+
+  <script src="options.js"></script>
+</body>
+</html>
