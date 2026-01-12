@@ -4,7 +4,9 @@
     armySizeThreshold: 0,
     hideInactive: true,
     enableTreasuryFilter: true,
-    enableArmySizeFilter: false
+    enableArmySizeFilter: false,
+    enableAllianceFilter: false,
+    allianceBlacklist: []
   };
 
   async function getConfig() {
@@ -22,10 +24,33 @@
     return parseInt(reversed, 10);
   }
 
+  function normalizeText(text) {
+    return String(text).replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  function extractAllianceName(rawText) {
+    const raw = String(rawText ?? '').trim();
+    if (!raw) return '';
+
+    // Most common: "ALLIANCE - Title" (title may be absent)
+    const spacedHyphen = raw.indexOf(' - ');
+    if (spacedHyphen >= 0) return raw.slice(0, spacedHyphen).trim();
+
+    // Fallback: if there is a hyphen but no spaces around it, split on first hyphen.
+    const anyHyphen = raw.indexOf('-');
+    if (anyHyphen >= 0) return raw.slice(0, anyHyphen).trim();
+
+    return raw;
+  }
+
   function filterRows(config) {
     const rows = document.querySelectorAll(
       'div > div > main > div:first-child > div > table:first-of-type > tbody > tr'
     );
+
+    const normalizedAllianceBlacklist = (config.allianceBlacklist || [])
+      .map(normalizeText)
+      .filter((s) => s.length > 0);
 
     let hiddenCount = 0;
     let shownCount = 0;
@@ -83,6 +108,31 @@
         }
       }
 
+      // Check alliance blacklist - alliance name is in td[1] as span.text-white (inside the brackets)
+      if (!shouldHide && config.enableAllianceFilter && normalizedAllianceBlacklist.length > 0) {
+        const firstTd = row.querySelector('td#name_titles') ?? row.querySelector('td:nth-child(1)');
+        if (firstTd) {
+          // Preferred: the alliance "name/tag" span in the bracket section (when present)
+          const allianceSpan = firstTd.querySelector('span.text-white');
+          const spanText = allianceSpan?.textContent;
+
+          // Fallback: parse the first [...] block, allowing newlines inside
+          const bracketMatch = firstTd.textContent?.match(/\[([\s\S]*?)\]/);
+          const bracketText = bracketMatch ? bracketMatch[1] : null;
+
+          const rawAllianceText = spanText ?? bracketText ?? '';
+          const allianceNameOnly = extractAllianceName(rawAllianceText);
+          const normalizedAllianceName = normalizeText(allianceNameOnly);
+
+          if (normalizedAllianceName) {
+            // Exact match (case-insensitive) on the alliance name only (before any " - Title" suffix).
+            if (normalizedAllianceBlacklist.includes(normalizedAllianceName)) {
+              shouldHide = true;
+            }
+          }
+        }
+      }
+
       if (shouldHide) {
         row.style.display = 'none';
         hiddenCount++;
@@ -95,6 +145,9 @@
     if (config.hideInactive) activeFilters.push('inactive');
     if (config.enableTreasuryFilter) activeFilters.push(`treasury<${config.threshold.toLocaleString()}`);
     if (config.enableArmySizeFilter) activeFilters.push(`army<${config.armySizeThreshold.toLocaleString()}`);
+    if (config.enableAllianceFilter && config.allianceBlacklist.length > 0) {
+      activeFilters.push(`alliances: ${config.allianceBlacklist.length}`);
+    }
     
     console.log(
       `[Battlefield Filter] Showing ${shownCount}, hidden ${hiddenCount} ` +

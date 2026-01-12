@@ -3,7 +3,9 @@ const DEFAULT_CONFIG = {
     armySizeThreshold: 0,
     hideInactive: true,
     enableTreasuryFilter: true,
-    enableArmySizeFilter: false
+    enableArmySizeFilter: false,
+    enableAllianceFilter: false,
+    allianceBlacklist: []
   };
   
   async function loadSettings() {
@@ -15,15 +17,24 @@ const DEFAULT_CONFIG = {
     document.getElementById('hideInactive').checked = config.hideInactive;
     document.getElementById('enableTreasuryFilter').checked = config.enableTreasuryFilter;
     document.getElementById('enableArmySizeFilter').checked = config.enableArmySizeFilter;
+    document.getElementById('enableAllianceFilter').checked = config.enableAllianceFilter;
+    document.getElementById('allianceBlacklist').value = (config.allianceBlacklist || []).join('\n');
   }
   
   async function saveSettings() {
+    const allianceBlacklistText = document.getElementById('allianceBlacklist').value.trim();
+    const allianceBlacklist = allianceBlacklistText
+      ? allianceBlacklistText.split('\n').map(line => line.trim()).filter(line => line.length > 0)
+      : [];
+    
     const config = {
       threshold: parseInt(document.getElementById('threshold').value, 10) || 0,
       armySizeThreshold: parseInt(document.getElementById('armySizeThreshold').value, 10) || 0,
       hideInactive: document.getElementById('hideInactive').checked,
       enableTreasuryFilter: document.getElementById('enableTreasuryFilter').checked,
-      enableArmySizeFilter: document.getElementById('enableArmySizeFilter').checked
+      enableArmySizeFilter: document.getElementById('enableArmySizeFilter').checked,
+      enableAllianceFilter: document.getElementById('enableAllianceFilter').checked,
+      allianceBlacklist: allianceBlacklist
     };
   
     await browser.storage.local.set({ config });

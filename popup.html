@@ -42,6 +42,23 @@
       outline: none;
       border-color: #ff6600;
     }
+    textarea {
+      width: 100%;
+      padding: 8px;
+      box-sizing: border-box;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #fff;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: system-ui, -apple-system, sans-serif;
+      resize: vertical;
+      min-height: 60px;
+    }
+    textarea:focus {
+      outline: none;
+      border-color: #ff6600;
+    }
     .checkbox-label {
       display: flex;
       align-items: center;
@@ -111,6 +128,17 @@
   <label class="checkbox-label">
     <input type="checkbox" id="hideInactive">
     <span>Hide inactive players (no action buttons)</span>
+  </label>
+
+  <label class="checkbox-label">
+    <input type="checkbox" id="enableAllianceFilter">
+    <span>Enable Alliance Filter</span>
+  </label>
+
+  <label>
+    <span class="label-text">Alliance Blacklist</span>
+    <textarea id="allianceBlacklist" placeholder="Enter alliance names, one per line."></textarea>
+    <div class="hint">Matches the alliance name only (text before any &quot; - Title&quot;). Case-insensitive. Exact matches only. One per line.</div>
   </label>
 
   <button id="save">Apply Filter</button>
