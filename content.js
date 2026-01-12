@@ -1,6 +1,6 @@
 (async function () {
   const DEFAULT_CONFIG = {
-    threshold: 500000,
+    threshold: 0,
     armySizeThreshold: 0,
     hideInactive: true,
     enableTreasuryFilter: true,
@@ -60,10 +60,17 @@
 
       let shouldHide = false;
 
-      // Check for inactive player (empty #actions)
+      // Check for inactive player (empty #actions or player name is not a link)
       if (config.hideInactive) {
         const actions = row.querySelector('#actions');
-        if (actions && actions.children.length === 0) {
+        const hasNoActions = actions && actions.children.length === 0;
+        
+        // Check if player name is not a link (fully inactive players)
+        const firstTd = row.querySelector('td#name_titles') ?? row.querySelector('td:nth-child(1)');
+        const playerNameLink = firstTd?.querySelector('a');
+        const hasNoPlayerNameLink = firstTd && !playerNameLink;
+        
+        if (hasNoActions || hasNoPlayerNameLink) {
           shouldHide = true;
         }
       }
