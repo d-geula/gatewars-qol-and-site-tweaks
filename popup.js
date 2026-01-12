@@ -1,12 +1,12 @@
 const DEFAULT_CONFIG = {
-    threshold: 500000,
-    armySizeThreshold: 0,
-    hideInactive: true,
-    enableTreasuryFilter: true,
-    enableArmySizeFilter: false,
-    enableAllianceFilter: false,
-    allianceBlacklist: []
-  };
+  threshold: 500000,
+  armySizeThreshold: 0,
+  hideInactive: true,
+  enableTreasuryFilter: true,
+  enableArmySizeFilter: false,
+  enableAllianceFilter: false,
+  allianceBlacklist: []
+};
   
   async function loadSettings() {
     const result = await browser.storage.local.get('config');

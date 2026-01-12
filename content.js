@@ -155,22 +155,22 @@
     );
   }
 
+  // Cache config to avoid hitting storage on every DOM mutation
+  let config = await getConfig();
+
   // Listen for config changes from popup
   browser.storage.onChanged.addListener((changes) => {
     if (changes.config) {
-      filterRows(changes.config.newValue);
+      config = changes.config.newValue;
+      filterRows(config);
     }
   });
 
   // Initial run
-  const config = await getConfig();
   setTimeout(() => filterRows(config), 500);
 
   // Re-run on DOM changes
-  const observer = new MutationObserver(async () => {
-    const config = await getConfig();
-    filterRows(config);
-  });
+  const observer = new MutationObserver(() => filterRows(config));
 
   observer.observe(document.body, {
     childList: true,
