@@ -158,7 +158,8 @@ async function populateCurrentPage() {
     const match = url.match(/[?&]page=(\d+)/);
     const currentPage = match ? parseInt(match[1], 10) : 1;
     
-    document.getElementById('startPage').value = currentPage;
+    // Set start page to next page (current + 1) since we're already on current page
+    document.getElementById('startPage').value = currentPage + 1;
   } catch (error) {
     // Silently fail - not critical
   }

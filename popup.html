@@ -101,7 +101,23 @@
   </style>
 </head>
 <body>
-  <h1>⚔️ Battlefield Filter</h1>
+  <h1>🔍 Page Scanner</h1>
+
+  <label>
+    <span class="label-text">Start Page</span>
+    <input type="number" id="startPage" min="1" max="2000" placeholder="1">
+  </label>
+
+  <label>
+    <span class="label-text">End Page</span>
+    <input type="number" id="endPage" min="1" max="2000" placeholder="2000">
+  </label>
+
+  <button id="startScanner" style="background: #4caf50;">Start Scanner</button>
+  <button id="stopScanner" style="background: #f44336; display: none; margin-top: 8px;">Stop Scanner</button>
+  <div class="saved" id="scannerMsg"></div>
+
+  <h1 style="margin-top: 24px; border-top: 1px solid #333; padding-top: 16px;">⚔️ Battlefield Filter</h1>
 
   <label class="checkbox-label">
     <input type="checkbox" id="enableTreasuryFilter">
@@ -143,22 +159,6 @@
 
   <button id="save">Apply Filter</button>
   <div class="saved" id="savedMsg">✓ Filter applied!</div>
-
-  <h1 style="margin-top: 24px; border-top: 1px solid #333; padding-top: 16px;">🔍 Page Scanner</h1>
-
-  <label>
-    <span class="label-text">Start Page</span>
-    <input type="number" id="startPage" min="1" max="2000" placeholder="1">
-  </label>
-
-  <label>
-    <span class="label-text">End Page</span>
-    <input type="number" id="endPage" min="1" max="2000" placeholder="2000">
-  </label>
-
-  <button id="startScanner" style="background: #4caf50;">Start Scanner</button>
-  <button id="stopScanner" style="background: #f44336; display: none; margin-top: 8px;">Stop Scanner</button>
-  <div class="saved" id="scannerMsg"></div>
 
   <script src="popup.js"></script>
 </body>
