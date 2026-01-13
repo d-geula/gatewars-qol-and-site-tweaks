@@ -7,47 +7,41 @@ const DEFAULT_CONFIG = {
   enableAllianceFilter: false,
   allianceBlacklist: []
 };
-  
-  async function loadSettings() {
-    const result = await browser.storage.local.get('config');
-    const config = { ...DEFAULT_CONFIG, ...result.config };
-  
-    document.getElementById('threshold').value = config.threshold;
-    document.getElementById('armySizeThreshold').value = config.armySizeThreshold;
-    document.getElementById('hideInactive').checked = config.hideInactive;
-    document.getElementById('enableTreasuryFilter').checked = config.enableTreasuryFilter;
-    document.getElementById('enableArmySizeFilter').checked = config.enableArmySizeFilter;
-    document.getElementById('enableAllianceFilter').checked = config.enableAllianceFilter;
-    document.getElementById('allianceBlacklist').value = (config.allianceBlacklist || []).join('\n');
-  }
-  
-  async function saveSettings() {
-    const allianceBlacklistText = document.getElementById('allianceBlacklist').value.trim();
-    const allianceBlacklist = allianceBlacklistText
-      ? allianceBlacklistText.split('\n').map(line => line.trim()).filter(line => line.length > 0)
-      : [];
-    
-    const config = {
-      threshold: parseInt(document.getElementById('threshold').value, 10) || 0,
-      armySizeThreshold: parseInt(document.getElementById('armySizeThreshold').value, 10) || 0,
-      hideInactive: document.getElementById('hideInactive').checked,
-      enableTreasuryFilter: document.getElementById('enableTreasuryFilter').checked,
-      enableArmySizeFilter: document.getElementById('enableArmySizeFilter').checked,
-      enableAllianceFilter: document.getElementById('enableAllianceFilter').checked,
-      allianceBlacklist: allianceBlacklist
-    };
-  
-    await browser.storage.local.set({ config });
-  
-    const msg = document.getElementById('savedMsg');
-    msg.style.display = 'block';
-    setTimeout(() => {
-      msg.style.display = 'none';
-    }, 1500);
-  }
-  
-  document.getElementById('save').addEventListener('click', saveSettings);
-  loadSettings();
+
+async function loadSettings() {
+  const result = await browser.storage.local.get('config');
+  const config = { ...DEFAULT_CONFIG, ...result.config };
+
+  document.getElementById('threshold').value = config.threshold;
+  document.getElementById('armySizeThreshold').value = config.armySizeThreshold;
+  document.getElementById('hideInactive').checked = config.hideInactive;
+  document.getElementById('enableTreasuryFilter').checked = config.enableTreasuryFilter;
+  document.getElementById('enableArmySizeFilter').checked = config.enableArmySizeFilter;
+  document.getElementById('enableAllianceFilter').checked = config.enableAllianceFilter;
+  document.getElementById('allianceBlacklist').value = (config.allianceBlacklist || []).join('\n');
+}
+
+async function saveSettings() {
+  const blacklistText = document.getElementById('allianceBlacklist').value.trim();
+  const config = {
+    threshold: parseInt(document.getElementById('threshold').value, 10) || 0,
+    armySizeThreshold: parseInt(document.getElementById('armySizeThreshold').value, 10) || 0,
+    hideInactive: document.getElementById('hideInactive').checked,
+    enableTreasuryFilter: document.getElementById('enableTreasuryFilter').checked,
+    enableArmySizeFilter: document.getElementById('enableArmySizeFilter').checked,
+    enableAllianceFilter: document.getElementById('enableAllianceFilter').checked,
+    allianceBlacklist: blacklistText ? blacklistText.split('\n').map(s => s.trim()).filter(Boolean) : []
+  };
+
+  await browser.storage.local.set({ config });
+
+  const msg = document.getElementById('savedMsg');
+  msg.style.display = 'block';
+  setTimeout(() => msg.style.display = 'none', 1500);
+}
+
+document.getElementById('save').addEventListener('click', saveSettings);
+loadSettings();
 
 // ─── Scanner ───────────────────────────────────────────────────────────────
 
@@ -56,6 +50,11 @@ function showScannerMsg(text, isSuccess = true) {
   msg.textContent = text;
   msg.style.display = 'block';
   msg.style.color = isSuccess ? '#4caf50' : '#f44336';
+}
+
+function setScannerRunning(running) {
+  document.getElementById('startScanner').style.display = running ? 'none' : 'block';
+  document.getElementById('stopScanner').style.display = running ? 'block' : 'none';
 }
 
 async function startScanner() {
@@ -67,7 +66,6 @@ async function startScanner() {
     return;
   }
 
-  // Get current tab and verify we're on a battlefield page
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
   if (tabs.length === 0) {
     showScannerMsg('No active tab!', false);
@@ -80,22 +78,15 @@ async function startScanner() {
     return;
   }
 
-  // Save scanner state and send start message
   await browser.storage.local.set({
     scannerState: { active: true, startPage, endPage, currentPage: startPage }
   });
 
-  document.getElementById('startScanner').style.display = 'none';
-  document.getElementById('stopScanner').style.display = 'block';
+  setScannerRunning(true);
   showScannerMsg(`Starting scan: pages ${startPage}-${endPage}...`);
 
-  // Tell content script to start (it will navigate if needed)
   try {
-    await browser.tabs.sendMessage(tabs[0].id, {
-      action: 'startScanner',
-      startPage,
-      endPage
-    });
+    await browser.tabs.sendMessage(tabs[0].id, { action: 'startScanner', startPage, endPage });
   } catch (error) {
     showScannerMsg(`Error: ${error.message}`, false);
   }
@@ -103,50 +94,40 @@ async function startScanner() {
 
 async function stopScanner() {
   await browser.storage.local.remove('scannerState');
-  
-  document.getElementById('startScanner').style.display = 'block';
-  document.getElementById('stopScanner').style.display = 'none';
+  setScannerRunning(false);
   showScannerMsg('Scanner stopped.');
 
-  // Tell content script to stop
   const tabs = await browser.tabs.query({ active: true, currentWindow: true });
   if (tabs.length > 0) {
     try {
       await browser.tabs.sendMessage(tabs[0].id, { action: 'stopScanner' });
-    } catch {
-      // Ignore if content script not loaded
-    }
+    } catch { /* content script may not be loaded */ }
   }
 }
 
-// Check if scanner is already running on load
 async function checkScannerState() {
   const result = await browser.storage.local.get('scannerState');
   if (result.scannerState?.active) {
-    document.getElementById('startScanner').style.display = 'none';
-    document.getElementById('stopScanner').style.display = 'block';
+    setScannerRunning(true);
     document.getElementById('startPage').value = result.scannerState.startPage;
     document.getElementById('endPage').value = result.scannerState.endPage;
     showScannerMsg(`Scanning page ${result.scannerState.currentPage}...`);
   }
 }
 
-// Listen for scanner status updates from content script
 browser.runtime.onMessage.addListener((message) => {
-  if (message.type === 'scannerStatus') {
-    if (message.status === 'found') {
-      showScannerMsg(`✓ Match found on page ${message.page}!`);
-      document.getElementById('startScanner').style.display = 'block';
-      document.getElementById('stopScanner').style.display = 'none';
-    } else if (message.status === 'complete') {
-      showScannerMsg(`Scan complete. No matches in range.`);
-      document.getElementById('startScanner').style.display = 'block';
-      document.getElementById('stopScanner').style.display = 'none';
-    } else if (message.status === 'scanning') {
-      showScannerMsg(`Scanning page ${message.page}...`);
-    } else if (message.status === 'error') {
-      showScannerMsg(`Error: ${message.message}`, false);
-    }
+  if (message.type !== 'scannerStatus') return;
+  
+  if (message.status === 'found') {
+    showScannerMsg(`✓ Match found on page ${message.page}!`);
+    setScannerRunning(false);
+  } else if (message.status === 'complete') {
+    showScannerMsg('Scan complete. No matches in range.');
+    setScannerRunning(false);
+  } else if (message.status === 'scanning') {
+    showScannerMsg(`Scanning page ${message.page}...`);
+  } else if (message.status === 'error') {
+    showScannerMsg(`Error: ${message.message}`, false);
   }
 });
 

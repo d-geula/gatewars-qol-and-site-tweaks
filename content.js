@@ -9,6 +9,8 @@
     allianceBlacklist: []
   };
 
+  const ROW_SELECTOR = 'div > div > main > div:first-child > div > table:first-of-type > tbody > tr';
+
   async function getConfig() {
     try {
       const result = await browser.storage.local.get('config');
@@ -43,23 +45,33 @@
     return raw;
   }
 
+  function getFirstTd(row) {
+    return row.querySelector('td#name_titles') ?? row.querySelector('td:nth-child(1)');
+  }
+
+  /**
+   * Check if a numeric cell value (reversed) fails to meet a threshold.
+   * Returns true if should hide (value is unknown or below threshold).
+   */
+  function failsThreshold(row, cellIndex, threshold) {
+    const el = row.querySelector(`td:nth-child(${cellIndex}) button x`);
+    if (!el) return false;
+    const text = el.textContent.trim();
+    if (/^\?+$/.test(text)) return true;
+    const value = parseReversedValue(text);
+    return !isNaN(value) && value < threshold;
+  }
+
   /**
    * Check if a row is a valid player row (not a spacer, header, or secondary row).
    * Player rows have: actions element (even if empty for inactive) + treasury element.
-   * Note: playerNameLink indicates active vs inactive, not row validity.
    */
   function isValidPlayerRow(row) {
-    const actions = row.querySelector('#actions');
-    const treasury = row.querySelector('td:nth-child(6) button x');
-    
-    // Player row = has actions element + has treasury element
-    return !!(actions && treasury);
+    return !!(row.querySelector('#actions') && row.querySelector('td:nth-child(6) button x'));
   }
 
   function filterRows(config) {
-    const rows = document.querySelectorAll(
-      'div > div > main > div:first-child > div > table:first-of-type > tbody > tr'
-    );
+    const rows = document.querySelectorAll(ROW_SELECTOR);
 
     const normalizedAllianceBlacklist = (config.allianceBlacklist || [])
       .map(normalizeText)
@@ -82,80 +94,32 @@
 
       // Check for inactive player (no player name link OR no action buttons)
       if (config.hideInactive) {
-        const firstTd = row.querySelector('td#name_titles') ?? row.querySelector('td:nth-child(1)');
-        const playerNameLink = firstTd?.querySelector('a');
+        const firstTd = getFirstTd(row);
         const actions = row.querySelector('#actions');
-        
-        const noPlayerLink = !playerNameLink;
-        const noActionButtons = actions && actions.children.length === 0;
-        
-        if (noPlayerLink || noActionButtons) {
+        if (!firstTd?.querySelector('a') || actions?.children.length === 0) {
           shouldHide = true;
         }
       }
 
-      // Check treasury value - it's inside td button x
-      if (!shouldHide && config.enableTreasuryFilter) {
-        const treasuryElement = row.querySelector('td:nth-child(6) button x');
-        
-        if (treasuryElement) {
-          const text = treasuryElement.textContent.trim();
-          
-          // Hide rows with question marks (unknown values)
-          if (/^\?+$/.test(text)) {
-            shouldHide = true;
-          } else {
-            const actualValue = parseReversedValue(text);
-
-            if (!isNaN(actualValue) && actualValue < config.threshold) {
-              shouldHide = true;
-            }
-          }
-        }
+      // Check treasury value (column 6, reversed)
+      if (!shouldHide && config.enableTreasuryFilter && failsThreshold(row, 6, config.threshold)) {
+        shouldHide = true;
       }
 
-      // Check army size - it's inside td[4] button x (also reversed)
-      if (!shouldHide && config.enableArmySizeFilter) {
-        const armySizeElement = row.querySelector('td:nth-child(4) button x');
-        
-        if (armySizeElement) {
-          const text = armySizeElement.textContent.trim();
-          
-          // Hide rows with question marks (unknown values)
-          if (/^\?+$/.test(text)) {
-            shouldHide = true;
-          } else {
-            const actualValue = parseReversedValue(text);
-
-            if (!isNaN(actualValue) && actualValue < config.armySizeThreshold) {
-              shouldHide = true;
-            }
-          }
-        }
+      // Check army size (column 4, reversed)
+      if (!shouldHide && config.enableArmySizeFilter && failsThreshold(row, 4, config.armySizeThreshold)) {
+        shouldHide = true;
       }
 
       // Check alliance blacklist - alliance name is in td[1] as span.text-white (inside the brackets)
       if (!shouldHide && config.enableAllianceFilter && normalizedAllianceBlacklist.length > 0) {
-        const firstTd = row.querySelector('td#name_titles') ?? row.querySelector('td:nth-child(1)');
-        if (firstTd) {
-          // Preferred: the alliance "name/tag" span in the bracket section (when present)
-          const allianceSpan = firstTd.querySelector('span.text-white');
-          const spanText = allianceSpan?.textContent;
-
-          // Fallback: parse the first [...] block, allowing newlines inside
-          const bracketMatch = firstTd.textContent?.match(/\[([\s\S]*?)\]/);
-          const bracketText = bracketMatch ? bracketMatch[1] : null;
-
-          const rawAllianceText = spanText ?? bracketText ?? '';
-          const allianceNameOnly = extractAllianceName(rawAllianceText);
-          const normalizedAllianceName = normalizeText(allianceNameOnly);
-
-          if (normalizedAllianceName) {
-            // Exact match (case-insensitive) on the alliance name only (before any " - Title" suffix).
-            if (normalizedAllianceBlacklist.includes(normalizedAllianceName)) {
-              shouldHide = true;
-            }
-          }
+        const firstTd = getFirstTd(row);
+        // Preferred: the alliance "name/tag" span; fallback: parse first [...] block
+        const spanText = firstTd?.querySelector('span.text-white')?.textContent;
+        const bracketText = firstTd?.textContent?.match(/\[([\s\S]*?)\]/)?.[1];
+        const allianceName = normalizeText(extractAllianceName(spanText ?? bracketText ?? ''));
+        if (allianceName && normalizedAllianceBlacklist.includes(allianceName)) {
+          shouldHide = true;
         }
       }
 
@@ -211,13 +175,8 @@
    */
   function isTargetablePlayer(row) {
     if (!isValidPlayerRow(row)) return false;
-    
-    const firstTd = row.querySelector('td#name_titles') ?? row.querySelector('td:nth-child(1)');
-    const playerNameLink = firstTd?.querySelector('a');
     const actions = row.querySelector('#actions');
-    
-    // Targetable = has player link + has action buttons
-    return !!(playerNameLink && actions && actions.children.length > 0);
+    return !!(getFirstTd(row)?.querySelector('a') && actions?.children.length > 0);
   }
 
   /**
@@ -225,10 +184,7 @@
    * Returns { total, visible, visiblePlayers[] } for debugging.
    */
   function countVisiblePlayers() {
-    const rows = document.querySelectorAll(
-      'div > div > main > div:first-child > div > table:first-of-type > tbody > tr'
-    );
-
+    const rows = document.querySelectorAll(ROW_SELECTOR);
     let total = 0;
     let visible = 0;
     const visiblePlayers = [];
@@ -236,15 +192,11 @@
     for (const row of rows) {
       if (!isTargetablePlayer(row)) continue;
       total++;
-
       if (row.style.display !== 'none') {
         visible++;
-        const firstTd = row.querySelector('td#name_titles') ?? row.querySelector('td:nth-child(1)');
-        const name = firstTd?.querySelector('a')?.textContent?.trim() ?? 'Unknown';
-        visiblePlayers.push(name);
+        visiblePlayers.push(getFirstTd(row)?.querySelector('a')?.textContent?.trim() ?? 'Unknown');
       }
     }
-
     return { total, visible, visiblePlayers };
   }
 
