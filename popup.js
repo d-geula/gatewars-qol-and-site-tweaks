@@ -82,6 +82,9 @@ async function startScanner() {
     scannerState: { active: true, startPage, endPage, currentPage: startPage }
   });
 
+  // Save page numbers for persistence
+  await saveScannerPages();
+
   setScannerRunning(true);
   showScannerMsg(`Starting scan: pages ${startPage}-${endPage}...`);
 
@@ -105,6 +108,26 @@ async function stopScanner() {
   }
 }
 
+async function loadScannerPages() {
+  // Don't overwrite if scanner is running
+  const scannerResult = await browser.storage.local.get('scannerState');
+  if (scannerResult.scannerState?.active) {
+    return;
+  }
+
+  const result = await browser.storage.local.get('scannerPages');
+  if (result.scannerPages?.endPage) {
+    document.getElementById('endPage').value = result.scannerPages.endPage;
+  }
+}
+
+async function saveScannerPages() {
+  const endPage = parseInt(document.getElementById('endPage').value, 10);
+  await browser.storage.local.set({
+    scannerPages: { endPage: endPage || null }
+  });
+}
+
 async function checkScannerState() {
   const result = await browser.storage.local.get('scannerState');
   if (result.scannerState?.active) {
@@ -112,6 +135,32 @@ async function checkScannerState() {
     document.getElementById('startPage').value = result.scannerState.startPage;
     document.getElementById('endPage').value = result.scannerState.endPage;
     showScannerMsg(`Scanning page ${result.scannerState.currentPage}...`);
+  }
+}
+
+async function populateCurrentPage() {
+  // Don't overwrite if scanner is running
+  const result = await browser.storage.local.get('scannerState');
+  if (result.scannerState?.active) {
+    return;
+  }
+
+  try {
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tabs.length === 0) return;
+
+    const url = tabs[0].url || '';
+    if (!url.includes('gatewa.rs') || !url.includes('battlefield')) {
+      return;
+    }
+
+    // Extract page number from URL (same logic as content.js)
+    const match = url.match(/[?&]page=(\d+)/);
+    const currentPage = match ? parseInt(match[1], 10) : 1;
+    
+    document.getElementById('startPage').value = currentPage;
+  } catch (error) {
+    // Silently fail - not critical
   }
 }
 
@@ -133,4 +182,7 @@ browser.runtime.onMessage.addListener((message) => {
 
 document.getElementById('startScanner').addEventListener('click', startScanner);
 document.getElementById('stopScanner').addEventListener('click', stopScanner);
+document.getElementById('endPage').addEventListener('change', saveScannerPages);
 checkScannerState();
+loadScannerPages();
+populateCurrentPage();
