@@ -17,7 +17,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://main.gatewa.rs/battlefield.php*"],
+      "matches": ["*://main.gatewa.rs/battlefield.php*", "*://main.gatewa.rs/battlefieldE.php*"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
