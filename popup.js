@@ -28,6 +28,11 @@ async function loadSettings() {
     config.refererOverrideUrl || DEFAULT_CONFIG.refererOverrideUrl;
 }
 
+const isPopout = new URLSearchParams(window.location.search).has('popout');
+if (isPopout) {
+  document.body.classList.add('popout');
+}
+
 async function saveSettings(showMessage = true) {
   const blacklistText = document.getElementById('allianceBlacklist').value.trim();
   const config = {
@@ -108,11 +113,11 @@ function initTabs() {
 initTabs();
 
 async function openPopoutWindow() {
-  const width = Math.max(320, Math.round(window.outerWidth || 320));
-  const height = Math.max(520, Math.round(window.outerHeight || 520));
+  const width = 330;
+  const height = 600;
 
   await browser.windows.create({
-    url: browser.runtime.getURL('popup.html'),
+    url: browser.runtime.getURL('popup.html?popout=1'),
     type: 'popup',
     width,
     height

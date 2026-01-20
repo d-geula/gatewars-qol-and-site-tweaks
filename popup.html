@@ -7,9 +7,16 @@
       font-family: system-ui, -apple-system, sans-serif;
       padding: 16px;
       width: 280px;
+      box-sizing: border-box;
       background: #1a1a1a;
       color: #e0e0e0;
       margin: 0;
+    }
+    body.popout {
+      width: 100%;
+      min-width: 280px;
+      max-width: 360px;
+      margin: 0 auto;
     }
     h1 {
       font-size: 14px;
@@ -35,14 +42,21 @@
     }
     .popout-button {
       width: auto;
-      padding: 6px 10px;
-      font-size: 12px;
-      background: #2a2a2a;
-      color: #e0e0e0;
+      padding: 6px;
+      background: #838383;
       border: 1px solid #333;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
     }
     .popout-button:hover {
       background: #3a3a3a;
+    }
+    .popout-button img {
+      width: 14px;
+      height: 14px;
+      display: block;
     }
     label {
       display: block;
@@ -155,7 +169,9 @@
 <body>
   <div class="header-row">
     <h1>🔍 Page Scanner</h1>
-    <button id="popOut" class="popout-button" type="button">Pop out</button>
+    <button id="popOut" class="popout-button" type="button" title="Pop out" aria-label="Pop out">
+      <img src="icons/popout.svg" alt="">
+    </button>
   </div>
 
   <label>
