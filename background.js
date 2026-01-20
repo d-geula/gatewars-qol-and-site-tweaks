@@ -1,9 +1,12 @@
 const DEFAULT_CONFIG = {
   enableRefererOverride: true,
-  refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars'
+  refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars',
+  scannerSoundEnabled: true,
+  scannerSoundVolume: 60
 };
 
 let config = { ...DEFAULT_CONFIG };
+const SCANNER_ALERT_SOUND_URL = browser.runtime.getURL('sounds/pop-alert.mp3');
 
 async function loadConfig() {
   try {
@@ -57,3 +60,32 @@ browser.storage.onChanged.addListener((changes) => {
 });
 
 loadConfig();
+
+function playScannerAlert() {
+  if (!config.scannerSoundEnabled) {
+    return;
+  }
+  const volume = Math.min(
+    1,
+    Math.max(0, (Number.isFinite(config.scannerSoundVolume) ? config.scannerSoundVolume : 60) / 100)
+  );
+  if (volume === 0) {
+    return;
+  }
+  try {
+    const audio = new Audio(SCANNER_ALERT_SOUND_URL);
+    audio.volume = volume;
+    audio.play().catch(() => {});
+  } catch {
+    // Ignore audio errors in background context.
+  }
+}
+
+browser.runtime.onMessage.addListener((message) => {
+  if (message?.type !== 'scannerStatus') {
+    return;
+  }
+  if (message.status === 'found') {
+    playScannerAlert();
+  }
+});

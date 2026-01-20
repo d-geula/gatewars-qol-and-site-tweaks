@@ -8,7 +8,9 @@ const DEFAULT_CONFIG = {
   allianceBlacklist: [],
   hideNoAttackAction: false,
   enableRefererOverride: true,
-  refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars'
+  refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars',
+  scannerSoundEnabled: true,
+  scannerSoundVolume: 60
 };
 
 async function loadSettings() {
@@ -26,6 +28,9 @@ async function loadSettings() {
   document.getElementById('enableRefererOverride').checked = config.enableRefererOverride ?? true;
   document.getElementById('refererOverrideUrl').value =
     config.refererOverrideUrl || DEFAULT_CONFIG.refererOverrideUrl;
+  document.getElementById('scannerSoundEnabled').checked = config.scannerSoundEnabled ?? true;
+  document.getElementById('scannerSoundVolume').value =
+    Number.isFinite(config.scannerSoundVolume) ? config.scannerSoundVolume : DEFAULT_CONFIG.scannerSoundVolume;
 }
 
 const isPopout = new URLSearchParams(window.location.search).has('popout');
@@ -45,7 +50,12 @@ async function saveSettings(showMessage = true) {
     allianceBlacklist: blacklistText ? blacklistText.split('\n').map(s => s.trim()).filter(Boolean) : [],
     hideNoAttackAction: document.getElementById('hideNoAttackAction').checked,
     enableRefererOverride: document.getElementById('enableRefererOverride').checked,
-    refererOverrideUrl: document.getElementById('refererOverrideUrl').value.trim()
+    refererOverrideUrl: document.getElementById('refererOverrideUrl').value.trim(),
+    scannerSoundEnabled: document.getElementById('scannerSoundEnabled').checked,
+    scannerSoundVolume: Math.min(
+      100,
+      Math.max(0, parseInt(document.getElementById('scannerSoundVolume').value, 10) || 0)
+    )
   };
 
   await browser.storage.local.set({ config });
@@ -64,6 +74,7 @@ document.getElementById('hideNoAttackAction').addEventListener('change', () => s
 document.getElementById('enableAllianceFilter').addEventListener('change', () => saveSettings(false));
 document.getElementById('hideInactive').addEventListener('change', () => saveSettings(false));
 document.getElementById('enableRefererOverride').addEventListener('change', () => saveSettings(false));
+document.getElementById('scannerSoundEnabled').addEventListener('change', () => saveSettings(false));
 
 // Auto-apply filters on number input changes (numeric stepper) and Enter key
 function setupNumberInputAutoApply(inputId) {
@@ -79,6 +90,7 @@ function setupNumberInputAutoApply(inputId) {
 
 setupNumberInputAutoApply('threshold');
 setupNumberInputAutoApply('armySizeThreshold');
+setupNumberInputAutoApply('scannerSoundVolume');
 
 // Auto-apply referer URL on Enter key
 document.getElementById('refererOverrideUrl').addEventListener('keydown', (e) => {
