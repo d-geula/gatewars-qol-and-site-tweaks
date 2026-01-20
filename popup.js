@@ -107,6 +107,22 @@ function initTabs() {
 
 initTabs();
 
+async function openPopoutWindow() {
+  const width = Math.max(320, Math.round(window.outerWidth || 320));
+  const height = Math.max(520, Math.round(window.outerHeight || 520));
+
+  await browser.windows.create({
+    url: browser.runtime.getURL('popup.html'),
+    type: 'popup',
+    width,
+    height
+  });
+
+  window.close();
+}
+
+document.getElementById('popOut').addEventListener('click', openPopoutWindow);
+
 // ─── Scanner ───────────────────────────────────────────────────────────────
 
 function showScannerMsg(text, isSuccess = true) {
