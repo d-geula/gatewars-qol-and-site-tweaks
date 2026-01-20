@@ -6,7 +6,8 @@ const DEFAULT_CONFIG = {
 };
 
 let config = { ...DEFAULT_CONFIG };
-const SCANNER_ALERT_SOUND_URL = browser.runtime.getURL('sounds/pop-alert.mp3');
+const SCANNER_ALERT_SOUND_URL = browser.runtime.getURL('sounds/pop-alert.ogg');
+const SCANNER_COMPLETE_SOUND_URL = browser.runtime.getURL('sounds/long-pop.ogg');
 
 async function loadConfig() {
   try {
@@ -61,7 +62,7 @@ browser.storage.onChanged.addListener((changes) => {
 
 loadConfig();
 
-function playScannerAlert() {
+function playScannerAlert(soundUrl) {
   if (!config.scannerSoundEnabled) {
     return;
   }
@@ -73,7 +74,7 @@ function playScannerAlert() {
     return;
   }
   try {
-    const audio = new Audio(SCANNER_ALERT_SOUND_URL);
+    const audio = new Audio(soundUrl);
     audio.volume = volume;
     audio.play().catch(() => {});
   } catch {
@@ -86,6 +87,8 @@ browser.runtime.onMessage.addListener((message) => {
     return;
   }
   if (message.status === 'found') {
-    playScannerAlert();
+    playScannerAlert(SCANNER_ALERT_SOUND_URL);
+  } else if (message.status === 'complete') {
+    playScannerAlert(SCANNER_COMPLETE_SOUND_URL);
   }
 });
