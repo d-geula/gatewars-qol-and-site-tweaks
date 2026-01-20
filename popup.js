@@ -5,7 +5,10 @@ const DEFAULT_CONFIG = {
   enableTreasuryFilter: true,
   enableArmySizeFilter: false,
   enableAllianceFilter: false,
-  allianceBlacklist: []
+  allianceBlacklist: [],
+  hideNoAttackAction: false,
+  enableRefererOverride: true,
+  refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars'
 };
 
 async function loadSettings() {
@@ -19,6 +22,10 @@ async function loadSettings() {
   document.getElementById('enableArmySizeFilter').checked = config.enableArmySizeFilter;
   document.getElementById('enableAllianceFilter').checked = config.enableAllianceFilter;
   document.getElementById('allianceBlacklist').value = (config.allianceBlacklist || []).join('\n');
+  document.getElementById('hideNoAttackAction').checked = config.hideNoAttackAction ?? false;
+  document.getElementById('enableRefererOverride').checked = config.enableRefererOverride ?? true;
+  document.getElementById('refererOverrideUrl').value =
+    config.refererOverrideUrl || DEFAULT_CONFIG.refererOverrideUrl;
 }
 
 async function saveSettings() {
@@ -30,7 +37,10 @@ async function saveSettings() {
     enableTreasuryFilter: document.getElementById('enableTreasuryFilter').checked,
     enableArmySizeFilter: document.getElementById('enableArmySizeFilter').checked,
     enableAllianceFilter: document.getElementById('enableAllianceFilter').checked,
-    allianceBlacklist: blacklistText ? blacklistText.split('\n').map(s => s.trim()).filter(Boolean) : []
+    allianceBlacklist: blacklistText ? blacklistText.split('\n').map(s => s.trim()).filter(Boolean) : [],
+    hideNoAttackAction: document.getElementById('hideNoAttackAction').checked,
+    enableRefererOverride: document.getElementById('enableRefererOverride').checked,
+    refererOverrideUrl: document.getElementById('refererOverrideUrl').value.trim()
   };
 
   await browser.storage.local.set({ config });
@@ -42,6 +52,26 @@ async function saveSettings() {
 
 document.getElementById('save').addEventListener('click', saveSettings);
 loadSettings();
+
+function initTabs() {
+  const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
+  const panes = {
+    filters: document.getElementById('tab-filters'),
+    settings: document.getElementById('tab-settings')
+  };
+
+  tabButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const tab = button.dataset.tab;
+      tabButtons.forEach((btn) => btn.classList.toggle('active', btn === button));
+      Object.entries(panes).forEach(([key, pane]) => {
+        pane.classList.toggle('active', key === tab);
+      });
+    });
+  });
+}
+
+initTabs();
 
 // ─── Scanner ───────────────────────────────────────────────────────────────
 

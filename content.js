@@ -7,7 +7,9 @@
     enableArmySizeFilter: false,
     enableAllianceFilter: false,
     allianceBlacklist: [],
-    hideNoAttackAction: false
+    hideNoAttackAction: false,
+    enableRefererOverride: true,
+    refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars'
   };
 
   const ROW_SELECTOR = 'div > div > main > div:first-child > div > table:first-of-type > tbody > tr';
@@ -169,7 +171,7 @@
       }
     });
 
-    if (pendingHide && totalPlayers > 0) {
+    if (pendingHide) {
       pendingHide = false;
       document.documentElement.classList.remove(PENDING_CLASS);
       pendingStyle.remove();
