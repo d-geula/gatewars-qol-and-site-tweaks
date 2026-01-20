@@ -6,10 +6,32 @@
     enableTreasuryFilter: true,
     enableArmySizeFilter: false,
     enableAllianceFilter: false,
-    allianceBlacklist: []
+    allianceBlacklist: [],
+    hideNoAttackAction: false
   };
 
   const ROW_SELECTOR = 'div > div > main > div:first-child > div > table:first-of-type > tbody > tr';
+  const PENDING_CLASS = 'bfh-pending-filter';
+
+  const pendingStyle = document.createElement('style');
+  pendingStyle.textContent = `
+    html.${PENDING_CLASS} ${ROW_SELECTOR} { visibility: hidden; }
+  `;
+  document.documentElement.classList.add(PENDING_CLASS);
+  document.documentElement.appendChild(pendingStyle);
+
+  async function waitForBody() {
+    if (document.body) return;
+    await new Promise((resolve) => {
+      const observer = new MutationObserver(() => {
+        if (document.body) {
+          observer.disconnect();
+          resolve();
+        }
+      });
+      observer.observe(document.documentElement, { childList: true });
+    });
+  }
 
   async function getConfig() {
     try {
@@ -70,6 +92,17 @@
     return !!(row.querySelector('#actions') && row.querySelector('td:nth-child(6) button x'));
   }
 
+  /**
+   * Check if a row has an attack action available (form with action="attack2.php").
+   * Returns true if attack action exists, false otherwise.
+   */
+  function hasAttackAction(row) {
+    const actions = row.querySelector('#actions');
+    if (!actions) return false;
+    // Look for forms with action="attack2.php" within the actions element only
+    return !!actions.querySelector('form[action="attack2.php"]');
+  }
+
   function filterRows(config) {
     const rows = document.querySelectorAll(ROW_SELECTOR);
 
@@ -123,6 +156,11 @@
         }
       }
 
+      // Check if player has attack action available (only if they pass other filters)
+      if (!shouldHide && config.hideNoAttackAction && !hasAttackAction(row)) {
+        shouldHide = true;
+      }
+
       if (shouldHide) {
         row.style.display = 'none';
         hiddenByFilter++;
@@ -131,6 +169,12 @@
       }
     });
 
+    if (pendingHide && totalPlayers > 0) {
+      pendingHide = false;
+      document.documentElement.classList.remove(PENDING_CLASS);
+      pendingStyle.remove();
+    }
+
     const activeFilters = [];
     if (config.hideInactive) activeFilters.push('inactive');
     if (config.enableTreasuryFilter) activeFilters.push(`treasury<${config.threshold.toLocaleString()}`);
@@ -138,6 +182,7 @@
     if (config.enableAllianceFilter && config.allianceBlacklist.length > 0) {
       activeFilters.push(`alliances: ${config.allianceBlacklist.length}`);
     }
+    if (config.hideNoAttackAction) activeFilters.push('no-attack-action');
     
     console.log(
       `[Battlefield Filter] ${visiblePlayers}/${totalPlayers} players visible ` +
@@ -147,6 +192,7 @@
 
   // Cache config to avoid hitting storage on every DOM mutation
   let config = await getConfig();
+  let pendingHide = true;
 
   // Listen for config changes from popup
   browser.storage.onChanged.addListener((changes) => {
@@ -157,7 +203,8 @@
   });
 
   // Initial run
-  setTimeout(() => filterRows(config), 500);
+  await waitForBody();
+  filterRows(config);
 
   // Re-run on DOM changes
   const observer = new MutationObserver(() => filterRows(config));

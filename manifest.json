@@ -19,7 +19,7 @@
     {
       "matches": ["*://main.gatewa.rs/battlefield.php*", "*://main.gatewa.rs/battlefieldE.php*"],
       "js": ["content.js"],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ]
 }
