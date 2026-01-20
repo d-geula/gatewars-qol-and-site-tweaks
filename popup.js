@@ -142,6 +142,36 @@ function setScannerRunning(running) {
   document.getElementById('stopScanner').style.display = running ? 'block' : 'none';
 }
 
+async function getActiveNormalTab() {
+  try {
+    const currentWindow = await browser.windows.getCurrent();
+    const normalWindows = await browser.windows.getAll({ windowTypes: ['normal'] });
+    const candidateWindows = normalWindows.filter(
+      (win) => win.id != null && win.id !== currentWindow?.id
+    );
+    const focusedWindow = candidateWindows.find((win) => win.focused);
+    const targetWindow = focusedWindow || candidateWindows[0];
+
+    if (targetWindow?.id != null) {
+      const tabs = await browser.tabs.query({ active: true, windowId: targetWindow.id });
+      if (tabs.length > 0) {
+        if (tabs[0].url && !tabs[0].url.startsWith('moz-extension://')) {
+          return tabs[0];
+        }
+      }
+    }
+  } catch {
+    // Fall through to fallback lookup.
+  }
+
+  // Fallback: any Battlefield tab in a normal window.
+  const battlefieldTabs = await browser.tabs.query({
+    url: ['*://*.gatewa.rs/battlefield.php*', '*://*.gatewa.rs/battlefieldE.php*'],
+    windowType: 'normal'
+  });
+  return battlefieldTabs[0] || null;
+}
+
 async function startScanner() {
   const startPage = parseInt(document.getElementById('startPage').value, 10);
   const endPage = parseInt(document.getElementById('endPage').value, 10);
@@ -151,13 +181,13 @@ async function startScanner() {
     return;
   }
 
-  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-  if (tabs.length === 0) {
-    showScannerMsg('No active tab!', false);
+  const activeTab = await getActiveNormalTab();
+  if (!activeTab) {
+    showScannerMsg('No active browser tab!', false);
     return;
   }
 
-  const url = (tabs[0].url || '').toLowerCase();
+  const url = (activeTab.url || '').toLowerCase();
   if (!url.includes('gatewa.rs') || !url.includes('battlefield')) {
     showScannerMsg(`Not on battlefield page! (${url.substring(0, 40)}...)`, false);
     return;
@@ -174,7 +204,7 @@ async function startScanner() {
   showScannerMsg(`Starting scan: pages ${startPage}-${endPage}...`);
 
   try {
-    await browser.tabs.sendMessage(tabs[0].id, { action: 'startScanner', startPage, endPage });
+    await browser.tabs.sendMessage(activeTab.id, { action: 'startScanner', startPage, endPage });
   } catch (error) {
     showScannerMsg(`Error: ${error.message}`, false);
   }
@@ -185,10 +215,10 @@ async function stopScanner() {
   setScannerRunning(false);
   showScannerMsg('Scanner stopped.');
 
-  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-  if (tabs.length > 0) {
+  const activeTab = await getActiveNormalTab();
+  if (activeTab) {
     try {
-      await browser.tabs.sendMessage(tabs[0].id, { action: 'stopScanner' });
+      await browser.tabs.sendMessage(activeTab.id, { action: 'stopScanner' });
     } catch { /* content script may not be loaded */ }
   }
 }
@@ -231,10 +261,10 @@ async function populateCurrentPage() {
   }
 
   try {
-    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-    if (tabs.length === 0) return;
+    const activeTab = await getActiveNormalTab();
+    if (!activeTab) return;
 
-    const url = tabs[0].url || '';
+    const url = activeTab.url || '';
     if (!url.includes('gatewa.rs') || !url.includes('battlefield')) {
       return;
     }
@@ -261,6 +291,11 @@ browser.runtime.onMessage.addListener((message) => {
     setScannerRunning(false);
   } else if (message.status === 'scanning') {
     showScannerMsg(`Scanning page ${message.page}...`);
+    const endPage = parseInt(document.getElementById('endPage').value, 10);
+    const nextPage = message.page + 1;
+    if (!endPage || nextPage <= endPage) {
+      document.getElementById('startPage').value = nextPage;
+    }
   } else if (message.status === 'error') {
     showScannerMsg(`Error: ${message.message}`, false);
   }
