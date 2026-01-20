@@ -28,7 +28,7 @@ async function loadSettings() {
     config.refererOverrideUrl || DEFAULT_CONFIG.refererOverrideUrl;
 }
 
-async function saveSettings() {
+async function saveSettings(showMessage = true) {
   const blacklistText = document.getElementById('allianceBlacklist').value.trim();
   const config = {
     threshold: parseInt(document.getElementById('threshold').value, 10) || 0,
@@ -45,12 +45,46 @@ async function saveSettings() {
 
   await browser.storage.local.set({ config });
 
-  const msg = document.getElementById('savedMsg');
-  msg.style.display = 'block';
-  setTimeout(() => msg.style.display = 'none', 1500);
+  if (showMessage) {
+    const msg = document.getElementById('savedMsg');
+    msg.style.display = 'block';
+    setTimeout(() => msg.style.display = 'none', 1500);
+  }
 }
 
-document.getElementById('save').addEventListener('click', saveSettings);
+// Auto-apply filters on checkbox changes
+document.getElementById('enableTreasuryFilter').addEventListener('change', () => saveSettings(false));
+document.getElementById('enableArmySizeFilter').addEventListener('change', () => saveSettings(false));
+document.getElementById('hideNoAttackAction').addEventListener('change', () => saveSettings(false));
+document.getElementById('enableAllianceFilter').addEventListener('change', () => saveSettings(false));
+document.getElementById('hideInactive').addEventListener('change', () => saveSettings(false));
+document.getElementById('enableRefererOverride').addEventListener('change', () => saveSettings(false));
+
+// Auto-apply filters on number input changes (numeric stepper) and Enter key
+function setupNumberInputAutoApply(inputId) {
+  const input = document.getElementById(inputId);
+  input.addEventListener('change', () => saveSettings(false));
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveSettings(false);
+    }
+  });
+}
+
+setupNumberInputAutoApply('threshold');
+setupNumberInputAutoApply('armySizeThreshold');
+
+// Auto-apply referer URL on Enter key
+document.getElementById('refererOverrideUrl').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    saveSettings(false);
+  }
+});
+
+// Keep "Apply Filter" button as fallback
+document.getElementById('save').addEventListener('click', () => saveSettings(true));
 loadSettings();
 
 function initTabs() {
@@ -214,6 +248,21 @@ browser.runtime.onMessage.addListener((message) => {
 document.getElementById('startScanner').addEventListener('click', startScanner);
 document.getElementById('stopScanner').addEventListener('click', stopScanner);
 document.getElementById('endPage').addEventListener('change', saveScannerPages);
+
+// Start scanner on Enter key in page number inputs
+document.getElementById('startPage').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    startScanner();
+  }
+});
+document.getElementById('endPage').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    startScanner();
+  }
+});
+
 checkScannerState();
 loadScannerPages();
 populateCurrentPage();
