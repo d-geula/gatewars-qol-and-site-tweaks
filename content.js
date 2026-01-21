@@ -119,9 +119,6 @@
         cursor: pointer;
         height: 22px;
       }
-      #${INLINE_FILTERS_ID} .bfh-inline-disabled {
-        opacity: 0.6;
-      }
     `;
     document.documentElement.appendChild(style);
   }
@@ -131,23 +128,6 @@
   }
 
   function updateInlineInputStates(container) {
-    const enableTreasury = container.querySelector('#bfh-inline-enableTreasury')?.checked;
-    const treasuryInput = container.querySelector('#bfh-inline-threshold');
-    if (treasuryInput) {
-      treasuryInput.disabled = !enableTreasury;
-    }
-
-    const enableArmy = container.querySelector('#bfh-inline-enableArmy')?.checked;
-    const armyInput = container.querySelector('#bfh-inline-armySize');
-    if (armyInput) {
-      armyInput.disabled = !enableArmy;
-    }
-
-    const enableAlliance = container.querySelector('#bfh-inline-enableAlliance')?.checked;
-    const allianceLabel = container.querySelector('#bfh-inline-enableAlliance')?.closest('.bfh-inline-label');
-    if (allianceLabel) {
-      allianceLabel.classList.toggle('bfh-inline-disabled', !enableAlliance);
-    }
   }
 
   function updateInlineFiltersUI(config) {
@@ -334,10 +314,8 @@
     const result = await browser.storage.local.get('scannerState');
     if (result.scannerState?.active) {
       setInlineScannerRunning(true);
-      updateInlineScannerProgress(
-        result.scannerState.currentPage || result.scannerState.startPage,
-        result.scannerState.endPage
-      );
+      const currentPage = getCurrentPageNumber();
+      updateInlineScannerProgress(currentPage, result.scannerState.endPage);
       elements.endInput.value = result.scannerState.endPage;
     }
   }
@@ -749,7 +727,8 @@
     if (state?.active) {
       console.log('[Scanner] Resuming scan after page load:', state);
       setInlineScannerRunning(true);
-      updateInlineScannerProgress(state.currentPage || state.startPage, state.endPage);
+      const currentPage = getCurrentPageNumber();
+      updateInlineScannerProgress(currentPage, state.endPage);
       scanCurrentPage();
     }
   })();
