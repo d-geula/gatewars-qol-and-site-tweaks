@@ -17,6 +17,9 @@
   const INLINE_FILTERS_ID = 'bfh-inline-filters';
   const INLINE_STYLE_ID = 'bfh-inline-filters-style';
   const PENDING_CLASS = 'bfh-pending-filter';
+  const INLINE_WRAPPER_CLASS = 'bfh-inline-wrap';
+  const SCANNER_STATE_PREFIX = 'scannerState:';
+  const SCANNER_PAGES_PREFIX = 'scannerPages:';
 
   const pendingStyle = document.createElement('style');
   pendingStyle.textContent = `
@@ -73,6 +76,16 @@
         margin-top: 6px;
         border-collapse: collapse;
       }
+      .${INLINE_WRAPPER_CLASS} {
+        width: 100%;
+        flex-basis: 100%;
+        flex: 0 0 100%;
+        max-width: 100%;
+        display: flex;
+        justify-content: center;
+        margin-top: 6px;
+        clear: both;
+      }
       #${INLINE_FILTERS_ID} td {
         font-size: 12px;
         color: inherit;
@@ -125,6 +138,42 @@
 
   function getInlineFiltersContainer() {
     return document.getElementById(INLINE_FILTERS_ID);
+  }
+
+  async function getTabId() {
+    if (getTabId.cached !== undefined) {
+      return getTabId.cached;
+    }
+    try {
+      const result = await browser.runtime.sendMessage({ type: 'getTabId' });
+      const tabId = Number.isFinite(result?.tabId) ? result.tabId : null;
+      getTabId.cached = tabId;
+      return tabId;
+    } catch {
+      getTabId.cached = null;
+      return null;
+    }
+  }
+
+  async function getScannerStorageKeys() {
+    const tabId = await getTabId();
+    const suffix = Number.isFinite(tabId) ? String(tabId) : 'global';
+    return {
+      stateKey: `${SCANNER_STATE_PREFIX}${suffix}`,
+      pagesKey: `${SCANNER_PAGES_PREFIX}${suffix}`
+    };
+  }
+
+  function findInlineInsertionParent() {
+    const parentXPath = '/html/body/div/div/main/div[1]/div/form/div';
+    const parentNode = document.evaluate(
+      parentXPath,
+      document,
+      null,
+      XPathResult.FIRST_ORDERED_NODE_TYPE,
+      null
+    ).singleNodeValue;
+    return parentNode || null;
   }
 
   function updateInlineInputStates(container) {
@@ -278,30 +327,33 @@
   async function loadScannerPages() {
     const elements = getInlineScannerElements();
     if (!elements) return;
-    const scannerResult = await browser.storage.local.get('scannerState');
-    if (scannerResult.scannerState?.active) {
+    const { stateKey, pagesKey } = await getScannerStorageKeys();
+    const scannerResult = await browser.storage.local.get(stateKey);
+    if (scannerResult[stateKey]?.active) {
       return;
     }
-    const result = await browser.storage.local.get('scannerPages');
-    if (result.scannerPages?.endPage) {
-      elements.endInput.value = result.scannerPages.endPage;
+    const result = await browser.storage.local.get(pagesKey);
+    if (result[pagesKey]?.endPage) {
+      elements.endInput.value = result[pagesKey].endPage;
     }
   }
 
   async function saveScannerPages() {
     const elements = getInlineScannerElements();
     if (!elements) return;
+    const { pagesKey } = await getScannerStorageKeys();
     const endPage = parseInt(elements.endInput.value, 10);
     await browser.storage.local.set({
-      scannerPages: { endPage: endPage || null }
+      [pagesKey]: { endPage: endPage || null }
     });
   }
 
   async function populateCurrentPage() {
     const elements = getInlineScannerElements();
     if (!elements) return;
-    const result = await browser.storage.local.get('scannerState');
-    if (result.scannerState?.active) {
+    const { stateKey } = await getScannerStorageKeys();
+    const result = await browser.storage.local.get(stateKey);
+    if (result[stateKey]?.active) {
       return;
     }
     const currentPage = getCurrentPageNumber();
@@ -311,12 +363,13 @@
   async function checkScannerState() {
     const elements = getInlineScannerElements();
     if (!elements) return;
-    const result = await browser.storage.local.get('scannerState');
-    if (result.scannerState?.active) {
+    const { stateKey } = await getScannerStorageKeys();
+    const result = await browser.storage.local.get(stateKey);
+    if (result[stateKey]?.active) {
       setInlineScannerRunning(true);
       const currentPage = getCurrentPageNumber();
-      updateInlineScannerProgress(currentPage, result.scannerState.endPage);
-      elements.endInput.value = result.scannerState.endPage;
+      updateInlineScannerProgress(currentPage, result[stateKey].endPage);
+      elements.endInput.value = result[stateKey].endPage;
     }
   }
 
@@ -331,8 +384,9 @@
       return;
     }
 
+    const { stateKey } = await getScannerStorageKeys();
     await browser.storage.local.set({
-      scannerState: { active: true, startPage, endPage, currentPage: startPage }
+      [stateKey]: { active: true, startPage, endPage, currentPage: startPage }
     });
 
     await saveScannerPages();
@@ -348,7 +402,8 @@
   }
 
   async function stopInlineScanner() {
-    await browser.storage.local.remove('scannerState');
+    const { stateKey } = await getScannerStorageKeys();
+    await browser.storage.local.remove(stateKey);
     setInlineScannerRunning(false);
   }
 
@@ -380,11 +435,25 @@
     if (!pagination || getInlineFiltersContainer()) return;
 
     const table = buildInlineFiltersUI();
+    const wrapper = document.createElement('div');
+    wrapper.className = INLINE_WRAPPER_CLASS;
+    wrapper.appendChild(table);
+
+    const insertionParent = findInlineInsertionParent();
     const nav = pagination.closest('nav');
-    if (nav?.parentElement) {
-      nav.insertAdjacentElement('afterend', table);
+    if (insertionParent) {
+      const computed = window.getComputedStyle(insertionParent);
+      if (computed.display === 'flex' || computed.display === 'inline-flex') {
+        insertionParent.style.flexWrap = 'wrap';
+        if (!insertionParent.style.rowGap) {
+          insertionParent.style.rowGap = '6px';
+        }
+      }
+      insertionParent.appendChild(wrapper);
+    } else if (nav?.parentElement) {
+      nav.insertAdjacentElement('afterend', wrapper);
     } else {
-      pagination.insertAdjacentElement('afterend', table);
+      pagination.insertAdjacentElement('afterend', wrapper);
     }
 
     updateInlineFiltersUI(config);
@@ -609,8 +678,9 @@
 
   async function loadScannerState() {
     try {
-      const result = await browser.storage.local.get('scannerState');
-      return result.scannerState || null;
+      const { stateKey } = await getScannerStorageKeys();
+      const result = await browser.storage.local.get(stateKey);
+      return result[stateKey] || null;
     } catch (error) {
       console.error('[Scanner] Error loading state:', error);
       return null;
@@ -619,7 +689,8 @@
 
   async function saveScannerState(state) {
     try {
-      await browser.storage.local.set({ scannerState: state });
+      const { stateKey } = await getScannerStorageKeys();
+      await browser.storage.local.set({ [stateKey]: state });
     } catch (error) {
       console.error('[Scanner] Error saving state:', error);
     }
@@ -627,7 +698,8 @@
 
   async function clearScannerState() {
     try {
-      await browser.storage.local.remove('scannerState');
+      const { stateKey } = await getScannerStorageKeys();
+      await browser.storage.local.remove(stateKey);
     } catch (error) {
       console.error('[Scanner] Error clearing state:', error);
     }

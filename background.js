@@ -82,7 +82,10 @@ function playScannerAlert(soundUrl) {
   }
 }
 
-browser.runtime.onMessage.addListener((message) => {
+browser.runtime.onMessage.addListener((message, sender) => {
+  if (message?.type === 'getTabId') {
+    return Promise.resolve({ tabId: sender?.tab?.id ?? null });
+  }
   if (message?.type !== 'scannerStatus') {
     return;
   }
