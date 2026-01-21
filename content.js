@@ -12,7 +12,10 @@
     refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars'
   };
 
-  const ROW_SELECTOR = 'div > div > main > div:first-child > div > table:first-of-type > tbody > tr';
+  const ROW_SELECTOR = 'main table tbody tr';
+  const PAGINATION_SELECTOR = 'ul.pagination.pagination-sm.justify-content-center';
+  const INLINE_FILTERS_ID = 'bfh-inline-filters';
+  const INLINE_STYLE_ID = 'bfh-inline-filters-style';
   const PENDING_CLASS = 'bfh-pending-filter';
 
   const pendingStyle = document.createElement('style');
@@ -42,6 +45,228 @@
     } catch {
       return DEFAULT_CONFIG;
     }
+  }
+
+  async function waitForElement(selector) {
+    const existing = document.querySelector(selector);
+    if (existing) return existing;
+
+    return await new Promise((resolve) => {
+      const observer = new MutationObserver(() => {
+        const found = document.querySelector(selector);
+        if (found) {
+          observer.disconnect();
+          resolve(found);
+        }
+      });
+      observer.observe(document.documentElement, { childList: true, subtree: true });
+    });
+  }
+
+  function ensureInlineFilterStyles() {
+    if (document.getElementById(INLINE_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = INLINE_STYLE_ID;
+    style.textContent = `
+      #${INLINE_FILTERS_ID} {
+        width: 100%;
+        margin-top: 6px;
+        border-collapse: collapse;
+      }
+      #${INLINE_FILTERS_ID} td {
+        font-size: 12px;
+        color: inherit;
+        padding: 4px 2px;
+      }
+      #${INLINE_FILTERS_ID} .bfh-inline-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 10px;
+        align-items: center;
+        justify-content: center;
+        margin: 4px 0;
+      }
+      #${INLINE_FILTERS_ID} .bfh-inline-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        line-height: 1;
+        white-space: nowrap;
+      }
+      #${INLINE_FILTERS_ID} input[type="checkbox"] {
+        margin: 0;
+        cursor: pointer;
+      }
+      #${INLINE_FILTERS_ID} .bfh-inline-input,
+      #${INLINE_FILTERS_ID} .bfh-inline-textarea {
+        font-size: 12px;
+        padding: 2px 4px;
+      }
+      #${INLINE_FILTERS_ID} .bfh-inline-input {
+        width: 110px;
+        height: 22px;
+        box-sizing: border-box;
+      }
+      #${INLINE_FILTERS_ID} .bfh-inline-textarea {
+        width: 240px;
+        height: 42px;
+        resize: vertical;
+      }
+      #${INLINE_FILTERS_ID} .bfh-inline-disabled {
+        opacity: 0.6;
+      }
+    `;
+    document.documentElement.appendChild(style);
+  }
+
+  function getInlineFiltersContainer() {
+    return document.getElementById(INLINE_FILTERS_ID);
+  }
+
+  function updateInlineInputStates(container) {
+    const enableTreasury = container.querySelector('#bfh-inline-enableTreasury')?.checked;
+    const treasuryInput = container.querySelector('#bfh-inline-threshold');
+    if (treasuryInput) {
+      treasuryInput.disabled = !enableTreasury;
+    }
+
+    const enableArmy = container.querySelector('#bfh-inline-enableArmy')?.checked;
+    const armyInput = container.querySelector('#bfh-inline-armySize');
+    if (armyInput) {
+      armyInput.disabled = !enableArmy;
+    }
+
+    const enableAlliance = container.querySelector('#bfh-inline-enableAlliance')?.checked;
+    const allianceLabel = container.querySelector('#bfh-inline-enableAlliance')?.closest('.bfh-inline-label');
+    if (allianceLabel) {
+      allianceLabel.classList.toggle('bfh-inline-disabled', !enableAlliance);
+    }
+  }
+
+  function updateInlineFiltersUI(config) {
+    const container = getInlineFiltersContainer();
+    if (!container) return;
+
+    container.querySelector('#bfh-inline-enableTreasury').checked = config.enableTreasuryFilter;
+    container.querySelector('#bfh-inline-threshold').value = config.threshold;
+    container.querySelector('#bfh-inline-enableArmy').checked = config.enableArmySizeFilter;
+    container.querySelector('#bfh-inline-armySize').value = config.armySizeThreshold;
+    container.querySelector('#bfh-inline-hideNoAttack').checked = config.hideNoAttackAction ?? false;
+    container.querySelector('#bfh-inline-enableAlliance').checked = config.enableAllianceFilter;
+
+    updateInlineInputStates(container);
+  }
+
+  function readInlineFiltersConfig(container) {
+    return {
+      enableTreasuryFilter: container.querySelector('#bfh-inline-enableTreasury').checked,
+      threshold: parseInt(container.querySelector('#bfh-inline-threshold').value, 10) || 0,
+      enableArmySizeFilter: container.querySelector('#bfh-inline-enableArmy').checked,
+      armySizeThreshold: parseInt(container.querySelector('#bfh-inline-armySize').value, 10) || 0,
+      hideNoAttackAction: container.querySelector('#bfh-inline-hideNoAttack').checked,
+      enableAllianceFilter: container.querySelector('#bfh-inline-enableAlliance').checked
+    };
+  }
+
+  async function saveInlineFilters(container) {
+    const inlineConfig = readInlineFiltersConfig(container);
+    const newConfig = { ...config, ...inlineConfig };
+    config = newConfig;
+    await browser.storage.local.set({ config: newConfig });
+    filterRows(newConfig);
+  }
+
+  function buildInlineFiltersUI() {
+    const table = document.createElement('table');
+    table.id = INLINE_FILTERS_ID;
+    table.innerHTML = `
+      <tbody>
+        <tr>
+          <td align="middle">
+            <div class="bfh-inline-row">
+              <strong>Filters:</strong>
+              <label class="bfh-inline-label">
+                <input type="checkbox" id="bfh-inline-enableTreasury">
+                Treasury &gt;=
+              </label>
+              <input type="number" id="bfh-inline-threshold" class="bfh-inline-input" min="0" step="100000" placeholder="500000">
+              <label class="bfh-inline-label">
+                <input type="checkbox" id="bfh-inline-enableArmy">
+                Army &gt;=
+              </label>
+              <input type="number" id="bfh-inline-armySize" class="bfh-inline-input" min="0" step="100000" placeholder="0">
+              <label class="bfh-inline-label">
+                <input type="checkbox" id="bfh-inline-hideNoAttack">
+                Hide no-attack
+              </label>
+              <label class="bfh-inline-label">
+                <input type="checkbox" id="bfh-inline-enableAlliance">
+                Alliance blacklist enabled
+              </label>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    `;
+    return table;
+  }
+
+  function setupInlineFilterHandlers(container) {
+    const autoApplyIds = [
+      'bfh-inline-enableTreasury',
+      'bfh-inline-threshold',
+      'bfh-inline-enableArmy',
+      'bfh-inline-armySize',
+      'bfh-inline-hideNoAttack',
+      'bfh-inline-enableAlliance'
+    ];
+
+    autoApplyIds.forEach((id) => {
+      const input = container.querySelector(`#${id}`);
+      input.addEventListener('change', () => saveInlineFilters(container));
+    });
+
+    container.querySelector('#bfh-inline-threshold').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        saveInlineFilters(container);
+      }
+    });
+    container.querySelector('#bfh-inline-armySize').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        saveInlineFilters(container);
+      }
+    });
+
+    container.querySelector('#bfh-inline-enableTreasury').addEventListener('change', () => {
+      updateInlineInputStates(container);
+    });
+    container.querySelector('#bfh-inline-enableArmy').addEventListener('change', () => {
+      updateInlineInputStates(container);
+    });
+    container.querySelector('#bfh-inline-enableAlliance').addEventListener('change', () => {
+      updateInlineInputStates(container);
+    });
+  }
+
+  async function injectInlineFilters() {
+    await waitForBody();
+    ensureInlineFilterStyles();
+    const pagination = await waitForElement(PAGINATION_SELECTOR);
+    if (!pagination || getInlineFiltersContainer()) return;
+
+    const table = buildInlineFiltersUI();
+    const nav = pagination.closest('nav');
+    if (nav?.parentElement) {
+      nav.insertAdjacentElement('afterend', table);
+    } else {
+      pagination.insertAdjacentElement('afterend', table);
+    }
+
+    updateInlineFiltersUI(config);
+    setupInlineFilterHandlers(table);
   }
 
   function parseReversedValue(text) {
@@ -201,11 +426,13 @@
     if (changes.config) {
       config = changes.config.newValue;
       filterRows(config);
+      updateInlineFiltersUI(config);
     }
   });
 
   // Initial run
   await waitForBody();
+  injectInlineFilters();
   filterRows(config);
 
   // Re-run on DOM changes
@@ -353,6 +580,13 @@
 
   // Listen for messages from popup
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.action === 'applyFilters') {
+      config = message.config || config;
+      filterRows(config);
+      updateInlineFiltersUI(config);
+      sendResponse({ success: true });
+      return true;
+    }
     if (message.action === 'startScanner') {
       console.log(`[Scanner] Starting: pages ${message.startPage}-${message.endPage}`);
       

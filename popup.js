@@ -38,7 +38,7 @@ if (isPopout) {
   document.body.classList.add('popout');
 }
 
-async function saveSettings(showMessage = true) {
+async function saveSettings(showMessage = true, messageElementId = 'savedMsg') {
   const blacklistText = document.getElementById('allianceBlacklist').value.trim();
   const config = {
     threshold: parseInt(document.getElementById('threshold').value, 10) || 0,
@@ -59,11 +59,23 @@ async function saveSettings(showMessage = true) {
   };
 
   await browser.storage.local.set({ config });
+  await applyFiltersToPage(config);
 
   if (showMessage) {
-    const msg = document.getElementById('savedMsg');
+    const msg = document.getElementById(messageElementId);
     msg.style.display = 'block';
     setTimeout(() => msg.style.display = 'none', 1500);
+  }
+}
+
+async function applyFiltersToPage(config) {
+  const activeTab = await getActiveNormalTab();
+  if (!activeTab?.id) return;
+
+  try {
+    await browser.tabs.sendMessage(activeTab.id, { action: 'applyFilters', config });
+  } catch {
+    // Content script may not be available on this tab.
   }
 }
 
@@ -101,7 +113,8 @@ document.getElementById('refererOverrideUrl').addEventListener('keydown', (e) =>
 });
 
 // Keep "Apply Filter" button as fallback
-document.getElementById('save').addEventListener('click', () => saveSettings(true));
+document.getElementById('save').addEventListener('click', () => saveSettings(true, 'savedMsg'));
+document.getElementById('saveSettings').addEventListener('click', () => saveSettings(true, 'savedSettingsMsg'));
 loadSettings();
 
 function initTabs() {

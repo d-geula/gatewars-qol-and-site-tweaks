@@ -228,12 +228,6 @@
       <span>Enable Alliance Filter</span>
     </label>
 
-    <label>
-      <span class="label-text">Alliance Blacklist</span>
-      <textarea id="allianceBlacklist" placeholder="Enter alliance names, one per line."></textarea>
-      <div class="hint">Matches the alliance name only (text before any &quot; - Title&quot;). Case-insensitive. Exact matches only. One per line.</div>
-    </label>
-
     <button id="save">Apply Filter</button>
     <div class="saved" id="savedMsg">✓ Filter applied!</div>
   </div>
@@ -265,6 +259,15 @@
       <input type="text" id="refererOverrideUrl" placeholder="https://main.gatewa.rs/base.php?game=gatewars">
       <div class="hint">Used for direct battlefield page loads.</div>
     </label>
+
+    <label>
+      <span class="label-text">Alliance Blacklist</span>
+      <textarea id="allianceBlacklist" placeholder="Enter alliance names, one per line."></textarea>
+      <div class="hint">Matches the alliance name only (text before any &quot; - Title&quot;). Case-insensitive. Exact matches only. One per line.</div>
+    </label>
+
+    <button id="saveSettings">Apply Filter</button>
+    <div class="saved" id="savedSettingsMsg">✓ Filter applied!</div>
   </div>
 
   <script src="popup.js"></script>
