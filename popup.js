@@ -17,14 +17,8 @@ async function loadSettings() {
   const result = await browser.storage.local.get('config');
   const config = { ...DEFAULT_CONFIG, ...result.config };
 
-  document.getElementById('threshold').value = config.threshold;
-  document.getElementById('armySizeThreshold').value = config.armySizeThreshold;
   document.getElementById('hideInactive').checked = config.hideInactive;
-  document.getElementById('enableTreasuryFilter').checked = config.enableTreasuryFilter;
-  document.getElementById('enableArmySizeFilter').checked = config.enableArmySizeFilter;
-  document.getElementById('enableAllianceFilter').checked = config.enableAllianceFilter;
   document.getElementById('allianceBlacklist').value = (config.allianceBlacklist || []).join('\n');
-  document.getElementById('hideNoAttackAction').checked = config.hideNoAttackAction ?? false;
   document.getElementById('enableRefererOverride').checked = config.enableRefererOverride ?? true;
   document.getElementById('refererOverrideUrl').value =
     config.refererOverrideUrl || DEFAULT_CONFIG.refererOverrideUrl;
@@ -33,22 +27,14 @@ async function loadSettings() {
     Number.isFinite(config.scannerSoundVolume) ? config.scannerSoundVolume : DEFAULT_CONFIG.scannerSoundVolume;
 }
 
-const isPopout = new URLSearchParams(window.location.search).has('popout');
-if (isPopout) {
-  document.body.classList.add('popout');
-}
-
-async function saveSettings(showMessage = true, messageElementId = 'savedMsg') {
+async function saveSettings(showMessage = true) {
   const blacklistText = document.getElementById('allianceBlacklist').value.trim();
+  const result = await browser.storage.local.get('config');
   const config = {
-    threshold: parseInt(document.getElementById('threshold').value, 10) || 0,
-    armySizeThreshold: parseInt(document.getElementById('armySizeThreshold').value, 10) || 0,
+    ...DEFAULT_CONFIG,
+    ...result.config,
     hideInactive: document.getElementById('hideInactive').checked,
-    enableTreasuryFilter: document.getElementById('enableTreasuryFilter').checked,
-    enableArmySizeFilter: document.getElementById('enableArmySizeFilter').checked,
-    enableAllianceFilter: document.getElementById('enableAllianceFilter').checked,
     allianceBlacklist: blacklistText ? blacklistText.split('\n').map(s => s.trim()).filter(Boolean) : [],
-    hideNoAttackAction: document.getElementById('hideNoAttackAction').checked,
     enableRefererOverride: document.getElementById('enableRefererOverride').checked,
     refererOverrideUrl: document.getElementById('refererOverrideUrl').value.trim(),
     scannerSoundEnabled: document.getElementById('scannerSoundEnabled').checked,
@@ -62,7 +48,7 @@ async function saveSettings(showMessage = true, messageElementId = 'savedMsg') {
   await applyFiltersToPage(config);
 
   if (showMessage) {
-    const msg = document.getElementById(messageElementId);
+    const msg = document.getElementById('savedSettingsMsg');
     msg.style.display = 'block';
     setTimeout(() => msg.style.display = 'none', 1500);
   }
@@ -79,11 +65,7 @@ async function applyFiltersToPage(config) {
   }
 }
 
-// Auto-apply filters on checkbox changes
-document.getElementById('enableTreasuryFilter').addEventListener('change', () => saveSettings(false));
-document.getElementById('enableArmySizeFilter').addEventListener('change', () => saveSettings(false));
-document.getElementById('hideNoAttackAction').addEventListener('change', () => saveSettings(false));
-document.getElementById('enableAllianceFilter').addEventListener('change', () => saveSettings(false));
+// Auto-apply settings on checkbox changes
 document.getElementById('hideInactive').addEventListener('change', () => saveSettings(false));
 document.getElementById('enableRefererOverride').addEventListener('change', () => saveSettings(false));
 document.getElementById('scannerSoundEnabled').addEventListener('change', () => saveSettings(false));
@@ -100,8 +82,6 @@ function setupNumberInputAutoApply(inputId) {
   });
 }
 
-setupNumberInputAutoApply('threshold');
-setupNumberInputAutoApply('armySizeThreshold');
 setupNumberInputAutoApply('scannerSoundVolume');
 
 // Auto-apply referer URL on Enter key
@@ -112,60 +92,9 @@ document.getElementById('refererOverrideUrl').addEventListener('keydown', (e) =>
   }
 });
 
-// Keep "Apply Filter" button as fallback
-document.getElementById('save').addEventListener('click', () => saveSettings(true, 'savedMsg'));
-document.getElementById('saveSettings').addEventListener('click', () => saveSettings(true, 'savedSettingsMsg'));
+document.getElementById('allianceBlacklist').addEventListener('change', () => saveSettings(false));
+document.getElementById('saveSettings').addEventListener('click', () => saveSettings(true));
 loadSettings();
-
-function initTabs() {
-  const tabButtons = Array.from(document.querySelectorAll('.tab-button'));
-  const panes = {
-    filters: document.getElementById('tab-filters'),
-    settings: document.getElementById('tab-settings')
-  };
-
-  tabButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const tab = button.dataset.tab;
-      tabButtons.forEach((btn) => btn.classList.toggle('active', btn === button));
-      Object.entries(panes).forEach(([key, pane]) => {
-        pane.classList.toggle('active', key === tab);
-      });
-    });
-  });
-}
-
-initTabs();
-
-async function openPopoutWindow() {
-  const width = 330;
-  const height = 600;
-
-  await browser.windows.create({
-    url: browser.runtime.getURL('popup.html?popout=1'),
-    type: 'popup',
-    width,
-    height
-  });
-
-  window.close();
-}
-
-document.getElementById('popOut').addEventListener('click', openPopoutWindow);
-
-// ─── Scanner ───────────────────────────────────────────────────────────────
-
-function showScannerMsg(text, isSuccess = true) {
-  const msg = document.getElementById('scannerMsg');
-  msg.textContent = text;
-  msg.style.display = 'block';
-  msg.style.color = isSuccess ? '#4caf50' : '#f44336';
-}
-
-function setScannerRunning(running) {
-  document.getElementById('startScanner').style.display = running ? 'none' : 'block';
-  document.getElementById('stopScanner').style.display = running ? 'block' : 'none';
-}
 
 async function getActiveNormalTab() {
   try {
@@ -196,154 +125,3 @@ async function getActiveNormalTab() {
   });
   return battlefieldTabs[0] || null;
 }
-
-async function startScanner() {
-  const startPage = parseInt(document.getElementById('startPage').value, 10);
-  const endPage = parseInt(document.getElementById('endPage').value, 10);
-
-  if (!startPage || !endPage || startPage < 1 || endPage > 2000 || startPage > endPage) {
-    showScannerMsg('Invalid page range!', false);
-    return;
-  }
-
-  const activeTab = await getActiveNormalTab();
-  if (!activeTab) {
-    showScannerMsg('No active browser tab!', false);
-    return;
-  }
-
-  const url = (activeTab.url || '').toLowerCase();
-  if (!url.includes('gatewa.rs') || !url.includes('battlefield')) {
-    showScannerMsg(`Not on battlefield page! (${url.substring(0, 40)}...)`, false);
-    return;
-  }
-
-  await browser.storage.local.set({
-    scannerState: { active: true, startPage, endPage, currentPage: startPage }
-  });
-
-  // Save page numbers for persistence
-  await saveScannerPages();
-
-  setScannerRunning(true);
-  showScannerMsg(`Starting scan: pages ${startPage}-${endPage}...`);
-
-  try {
-    await browser.tabs.sendMessage(activeTab.id, { action: 'startScanner', startPage, endPage });
-  } catch (error) {
-    showScannerMsg(`Error: ${error.message}`, false);
-  }
-}
-
-async function stopScanner() {
-  await browser.storage.local.remove('scannerState');
-  setScannerRunning(false);
-  showScannerMsg('Scanner stopped.');
-
-  const activeTab = await getActiveNormalTab();
-  if (activeTab) {
-    try {
-      await browser.tabs.sendMessage(activeTab.id, { action: 'stopScanner' });
-    } catch { /* content script may not be loaded */ }
-  }
-}
-
-async function loadScannerPages() {
-  // Don't overwrite if scanner is running
-  const scannerResult = await browser.storage.local.get('scannerState');
-  if (scannerResult.scannerState?.active) {
-    return;
-  }
-
-  const result = await browser.storage.local.get('scannerPages');
-  if (result.scannerPages?.endPage) {
-    document.getElementById('endPage').value = result.scannerPages.endPage;
-  }
-}
-
-async function saveScannerPages() {
-  const endPage = parseInt(document.getElementById('endPage').value, 10);
-  await browser.storage.local.set({
-    scannerPages: { endPage: endPage || null }
-  });
-}
-
-async function checkScannerState() {
-  const result = await browser.storage.local.get('scannerState');
-  if (result.scannerState?.active) {
-    setScannerRunning(true);
-    document.getElementById('startPage').value = result.scannerState.startPage;
-    document.getElementById('endPage').value = result.scannerState.endPage;
-    showScannerMsg(`Scanning page ${result.scannerState.currentPage}...`);
-  }
-}
-
-async function populateCurrentPage() {
-  // Don't overwrite if scanner is running
-  const result = await browser.storage.local.get('scannerState');
-  if (result.scannerState?.active) {
-    return;
-  }
-
-  try {
-    const activeTab = await getActiveNormalTab();
-    if (!activeTab) return;
-
-    const url = activeTab.url || '';
-    if (!url.includes('gatewa.rs') || !url.includes('battlefield')) {
-      return;
-    }
-
-    // Extract page number from URL (same logic as content.js)
-    const match = url.match(/[?&]page=(\d+)/);
-    const currentPage = match ? parseInt(match[1], 10) : 1;
-    
-    // Set start page to next page (current + 1) since we're already on current page
-    document.getElementById('startPage').value = currentPage + 1;
-  } catch (error) {
-    // Silently fail - not critical
-  }
-}
-
-browser.runtime.onMessage.addListener((message) => {
-  if (message.type !== 'scannerStatus') return;
-  
-  if (message.status === 'found') {
-    showScannerMsg(`✓ Match found on page ${message.page}!`);
-    setScannerRunning(false);
-  } else if (message.status === 'complete') {
-    showScannerMsg('Scan complete. No matches in range.');
-    setScannerRunning(false);
-  } else if (message.status === 'scanning') {
-    showScannerMsg(`Scanning page ${message.page}...`);
-    const endPage = parseInt(document.getElementById('endPage').value, 10);
-    const nextPage = message.page + 1;
-    if (!endPage || nextPage <= endPage) {
-      document.getElementById('startPage').value = nextPage;
-    }
-  } else if (message.status === 'error') {
-    showScannerMsg(`Error: ${message.message}`, false);
-  }
-});
-
-document.getElementById('startScanner').addEventListener('click', startScanner);
-document.getElementById('stopScanner').addEventListener('click', stopScanner);
-document.getElementById('endPage').addEventListener('change', saveScannerPages);
-
-// Start scanner on Enter key in page number inputs
-document.getElementById('startPage').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    startScanner();
-  }
-});
-document.getElementById('endPage').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    startScanner();
-  }
-});
-
-checkScannerState();
-loadScannerPages();
-populateCurrentPage();

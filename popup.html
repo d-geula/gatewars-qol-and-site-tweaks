@@ -12,51 +12,12 @@
       color: #e0e0e0;
       margin: 0;
     }
-    body.popout {
-      width: 100%;
-      min-width: 280px;
-      max-width: 360px;
-      margin: 0 auto;
-    }
     h1 {
       font-size: 14px;
       margin: 0 0 16px 0;
       color: #fff;
       border-bottom: 1px solid #333;
       padding-bottom: 8px;
-    }
-    .header-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 16px;
-      border-bottom: 1px solid #333;
-      padding-bottom: 8px;
-    }
-    .header-row h1 {
-      margin: 0;
-      border-bottom: none;
-      padding-bottom: 0;
-      flex: 1;
-    }
-    .popout-button {
-      width: auto;
-      padding: 6px;
-      background: #838383;
-      border: 1px solid #333;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-    }
-    .popout-button:hover {
-      background: #3a3a3a;
-    }
-    .popout-button img {
-      width: 14px;
-      height: 14px;
-      display: block;
     }
     label {
       display: block;
@@ -133,32 +94,6 @@
       font-size: 12px;
       display: none;
     }
-    .tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    .tab-button {
-      flex: 1;
-      background: #2a2a2a;
-      color: #e0e0e0;
-      border: 1px solid #333;
-      padding: 8px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 13px;
-    }
-    .tab-button.active {
-      background: #ff6600;
-      color: #fff;
-      border-color: #ff6600;
-    }
-    .tab-pane {
-      display: none;
-    }
-    .tab-pane.active {
-      display: block;
-    }
     .hint {
       font-size: 11px;
       color: #888;
@@ -167,108 +102,43 @@
   </style>
 </head>
 <body>
-  <div class="header-row">
-    <h1>🔍 Page Scanner</h1>
-    <button id="popOut" class="popout-button" type="button" title="Pop out" aria-label="Pop out">
-      <img src="icons/popout.svg" alt="">
-    </button>
-  </div>
+  <h1>⚙️ Battlefield Settings</h1>
 
-  <label>
-    <span class="label-text">Start Page</span>
-    <input type="number" id="startPage" min="1" max="2000" placeholder="1">
+  <label class="checkbox-label">
+    <input type="checkbox" id="hideInactive">
+    <span>Hide inactive players (no action buttons)</span>
+  </label>
+
+  <label class="checkbox-label">
+    <input type="checkbox" id="scannerSoundEnabled">
+    <span>Scanner match sound</span>
   </label>
 
   <label>
-    <span class="label-text">End Page</span>
-    <input type="number" id="endPage" min="1" max="2000" placeholder="2000">
+    <span class="label-text">Scanner sound volume (0-100)</span>
+    <input type="number" id="scannerSoundVolume" min="0" max="100" step="5" placeholder="60">
+    <div class="hint">Used for match notifications while scanning.</div>
   </label>
 
-  <button id="startScanner" style="background: #4caf50;">Start Scanner</button>
-  <button id="stopScanner" style="background: #f44336; display: none; margin-top: 8px;">Stop Scanner</button>
-  <div class="saved" id="scannerMsg"></div>
+  <label class="checkbox-label">
+    <input type="checkbox" id="enableRefererOverride">
+    <span>Override Referer header</span>
+  </label>
 
-  <h1 style="margin-top: 24px; border-top: 1px solid #333; padding-top: 16px;">⚔️ Battlefield Filter</h1>
+  <label>
+    <span class="label-text">Referer URL</span>
+    <input type="text" id="refererOverrideUrl" placeholder="https://main.gatewa.rs/base.php?game=gatewars">
+    <div class="hint">Used for direct battlefield page loads.</div>
+  </label>
 
-  <div class="tabs">
-    <button class="tab-button active" data-tab="filters">Filters</button>
-    <button class="tab-button" data-tab="settings">Settings</button>
-  </div>
+  <label>
+    <span class="label-text">Alliance Blacklist</span>
+    <textarea id="allianceBlacklist" placeholder="Enter alliance names, one per line."></textarea>
+    <div class="hint">Matches the alliance name only (text before any &quot; - Title&quot;). Case-insensitive. Exact matches only. One per line.</div>
+  </label>
 
-  <div class="tab-pane active" id="tab-filters">
-    <label class="checkbox-label">
-      <input type="checkbox" id="enableTreasuryFilter">
-      <span>Enable Treasury Filter</span>
-    </label>
-
-    <label>
-      <span class="label-text">Minimum Treasury (actual value)</span>
-      <input type="number" id="threshold" min="0" step="100000" placeholder="500000">
-      <div class="hint">Values are auto-reversed (e.g., 123,456 → 654,321)</div>
-    </label>
-
-    <label class="checkbox-label">
-      <input type="checkbox" id="enableArmySizeFilter">
-      <span>Enable Army Size Filter</span>
-    </label>
-
-    <label>
-      <span class="label-text">Minimum Army Size (actual value)</span>
-      <input type="number" id="armySizeThreshold" min="0" step="100000" placeholder="0">
-      <div class="hint">Values are auto-reversed (e.g., 123,456 → 654,321)</div>
-    </label>
-
-    <label class="checkbox-label">
-      <input type="checkbox" id="hideNoAttackAction">
-      <span>Hide players without attack action</span>
-    </label>
-
-    <label class="checkbox-label">
-      <input type="checkbox" id="enableAllianceFilter">
-      <span>Enable Alliance Filter</span>
-    </label>
-
-    <button id="save">Apply Filter</button>
-    <div class="saved" id="savedMsg">✓ Filter applied!</div>
-  </div>
-
-  <div class="tab-pane" id="tab-settings">
-    <label class="checkbox-label">
-      <input type="checkbox" id="hideInactive">
-      <span>Hide inactive players (no action buttons)</span>
-    </label>
-
-    <label class="checkbox-label">
-      <input type="checkbox" id="scannerSoundEnabled">
-      <span>Scanner match sound</span>
-    </label>
-
-    <label>
-      <span class="label-text">Scanner sound volume (0-100)</span>
-      <input type="number" id="scannerSoundVolume" min="0" max="100" step="5" placeholder="60">
-      <div class="hint">Used for match notifications while scanning.</div>
-    </label>
-
-    <label class="checkbox-label">
-      <input type="checkbox" id="enableRefererOverride">
-      <span>Override Referer header</span>
-    </label>
-
-    <label>
-      <span class="label-text">Referer URL</span>
-      <input type="text" id="refererOverrideUrl" placeholder="https://main.gatewa.rs/base.php?game=gatewars">
-      <div class="hint">Used for direct battlefield page loads.</div>
-    </label>
-
-    <label>
-      <span class="label-text">Alliance Blacklist</span>
-      <textarea id="allianceBlacklist" placeholder="Enter alliance names, one per line."></textarea>
-      <div class="hint">Matches the alliance name only (text before any &quot; - Title&quot;). Case-insensitive. Exact matches only. One per line.</div>
-    </label>
-
-    <button id="saveSettings">Apply Filter</button>
-    <div class="saved" id="savedSettingsMsg">✓ Filter applied!</div>
-  </div>
+  <button id="saveSettings">Apply Settings</button>
+  <div class="saved" id="savedSettingsMsg">✓ Settings applied!</div>
 
   <script src="popup.js"></script>
 </body>

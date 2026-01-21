@@ -113,6 +113,12 @@
         height: 42px;
         resize: vertical;
       }
+      #${INLINE_FILTERS_ID} .bfh-inline-button {
+        font-size: 12px;
+        padding: 2px 8px;
+        cursor: pointer;
+        height: 22px;
+      }
       #${INLINE_FILTERS_ID} .bfh-inline-disabled {
         opacity: 0.6;
       }
@@ -207,6 +213,19 @@
             </div>
           </td>
         </tr>
+        <tr>
+          <td align="middle">
+            <div class="bfh-inline-row">
+              <strong>Scanner:</strong>
+              <span class="bfh-inline-label">Start</span>
+              <input type="number" id="bfh-inline-startPage" class="bfh-inline-input" min="1" max="2000" placeholder="1">
+              <span class="bfh-inline-label">End</span>
+              <input type="number" id="bfh-inline-endPage" class="bfh-inline-input" min="1" max="2000" placeholder="2000">
+              <button type="button" class="bfh-inline-button" id="bfh-inline-startScanner" style="background: #4caf50; color: #fff; border: 0;">Start</button>
+              <button type="button" class="bfh-inline-button" id="bfh-inline-stopScanner" style="background: #f44336; color: #fff; border: 0; display: none;">Stop</button>
+            </div>
+          </td>
+        </tr>
       </tbody>
     `;
     return table;
@@ -251,6 +270,131 @@
     });
   }
 
+  function getInlineScannerElements() {
+    const container = getInlineFiltersContainer();
+    if (!container) return null;
+    return {
+      startInput: container.querySelector('#bfh-inline-startPage'),
+      endInput: container.querySelector('#bfh-inline-endPage'),
+      startButton: container.querySelector('#bfh-inline-startScanner'),
+      stopButton: container.querySelector('#bfh-inline-stopScanner')
+    };
+  }
+
+  function setInlineScannerRunning(running) {
+    const elements = getInlineScannerElements();
+    if (!elements) return;
+    elements.startButton.style.display = running ? 'none' : 'inline-block';
+    elements.stopButton.style.display = running ? 'inline-block' : 'none';
+  }
+
+  function updateInlineScannerProgress(currentPage, endPage) {
+    const elements = getInlineScannerElements();
+    if (!elements) return;
+    const nextPage = Math.min(currentPage + 1, endPage);
+    elements.startInput.value = nextPage;
+  }
+
+  async function loadScannerPages() {
+    const elements = getInlineScannerElements();
+    if (!elements) return;
+    const scannerResult = await browser.storage.local.get('scannerState');
+    if (scannerResult.scannerState?.active) {
+      return;
+    }
+    const result = await browser.storage.local.get('scannerPages');
+    if (result.scannerPages?.endPage) {
+      elements.endInput.value = result.scannerPages.endPage;
+    }
+  }
+
+  async function saveScannerPages() {
+    const elements = getInlineScannerElements();
+    if (!elements) return;
+    const endPage = parseInt(elements.endInput.value, 10);
+    await browser.storage.local.set({
+      scannerPages: { endPage: endPage || null }
+    });
+  }
+
+  async function populateCurrentPage() {
+    const elements = getInlineScannerElements();
+    if (!elements) return;
+    const result = await browser.storage.local.get('scannerState');
+    if (result.scannerState?.active) {
+      return;
+    }
+    const currentPage = getCurrentPageNumber();
+    elements.startInput.value = currentPage + 1;
+  }
+
+  async function checkScannerState() {
+    const elements = getInlineScannerElements();
+    if (!elements) return;
+    const result = await browser.storage.local.get('scannerState');
+    if (result.scannerState?.active) {
+      setInlineScannerRunning(true);
+      updateInlineScannerProgress(
+        result.scannerState.currentPage || result.scannerState.startPage,
+        result.scannerState.endPage
+      );
+      elements.endInput.value = result.scannerState.endPage;
+    }
+  }
+
+  async function startInlineScanner() {
+    const elements = getInlineScannerElements();
+    if (!elements) return;
+    const startPage = parseInt(elements.startInput.value, 10);
+    const endPage = parseInt(elements.endInput.value, 10);
+
+    if (!startPage || !endPage || startPage < 1 || endPage > 2000 || startPage > endPage) {
+      console.warn('[Scanner] Invalid page range.');
+      return;
+    }
+
+    await browser.storage.local.set({
+      scannerState: { active: true, startPage, endPage, currentPage: startPage }
+    });
+
+    await saveScannerPages();
+    setInlineScannerRunning(true);
+
+    const currentPage = getCurrentPageNumber();
+    if (currentPage !== startPage) {
+      const baseUrl = window.location.href.split('?')[0];
+      window.location.href = `${baseUrl}?page=${startPage}`;
+    } else {
+      scanCurrentPage();
+    }
+  }
+
+  async function stopInlineScanner() {
+    await browser.storage.local.remove('scannerState');
+    setInlineScannerRunning(false);
+  }
+
+  function setupInlineScannerHandlers() {
+    const elements = getInlineScannerElements();
+    if (!elements) return;
+    elements.startButton.addEventListener('click', startInlineScanner);
+    elements.stopButton.addEventListener('click', stopInlineScanner);
+    elements.endInput.addEventListener('change', saveScannerPages);
+
+    elements.startInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        startInlineScanner();
+      }
+    });
+    elements.endInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        startInlineScanner();
+      }
+    });
+  }
+
   async function injectInlineFilters() {
     await waitForBody();
     ensureInlineFilterStyles();
@@ -267,6 +411,10 @@
 
     updateInlineFiltersUI(config);
     setupInlineFilterHandlers(table);
+    setupInlineScannerHandlers();
+    loadScannerPages();
+    populateCurrentPage();
+    checkScannerState();
   }
 
   function parseReversedValue(text) {
@@ -528,7 +676,7 @@
     // Update state with current page
     state.currentPage = currentPage;
     await saveScannerState(state);
-    sendStatus('scanning', currentPage);
+    updateInlineScannerProgress(currentPage, state.endPage);
 
     // Wait for DOM to settle, then apply filters and check
     // Random wait 1-3 seconds
@@ -558,6 +706,7 @@
         console.log(`[Scanner] ✓ MATCH FOUND on page ${currentPage}!`);
         await clearScannerState();
         sendStatus('found', currentPage);
+        setInlineScannerRunning(false);
         return;
       }
 
@@ -566,6 +715,7 @@
         console.log(`[Scanner] Reached end of range (page ${currentPage})`);
         await clearScannerState();
         sendStatus('complete', currentPage);
+        setInlineScannerRunning(false);
         return;
       }
 
@@ -587,28 +737,7 @@
       sendResponse({ success: true });
       return true;
     }
-    if (message.action === 'startScanner') {
-      console.log(`[Scanner] Starting: pages ${message.startPage}-${message.endPage}`);
-      
-      const currentPage = getCurrentPageNumber();
-      
-      // If not on start page, navigate there first
-      if (currentPage !== message.startPage) {
-        console.log(`[Scanner] Navigating to start page ${message.startPage}`);
-        const baseUrl = window.location.href.split('?')[0];
-        window.location.href = `${baseUrl}?page=${message.startPage}`;
-      } else {
-        // Already on start page, begin scanning
-        scanCurrentPage();
-      }
-      
-      sendResponse({ success: true });
-    } else if (message.action === 'stopScanner') {
-      console.log('[Scanner] Stopped by user');
-      clearScannerState();
-      sendResponse({ success: true });
-    }
-    return true;
+    return false;
   });
 
   // On page load, check if we should continue scanning
@@ -619,6 +748,8 @@
     const state = await loadScannerState();
     if (state?.active) {
       console.log('[Scanner] Resuming scan after page load:', state);
+      setInlineScannerRunning(true);
+      updateInlineScannerProgress(state.currentPage || state.startPage, state.endPage);
       scanCurrentPage();
     }
   })();
