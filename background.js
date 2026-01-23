@@ -48,8 +48,7 @@ browser.webRequest.onBeforeSendHeaders.addListener(
     return { requestHeaders: setRefererHeader(headers, refererValue) };
   },
   {
-    urls: ['*://main.gatewa.rs/battlefield.php*', '*://main.gatewa.rs/battlefieldE.php*'],
-    types: ['main_frame']
+    urls: ['*://main.gatewa.rs/*']
   },
   ['blocking', 'requestHeaders']
 );
