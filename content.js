@@ -11,7 +11,8 @@
     enableRefererOverride: true,
     refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars',
     tweakSidebarListGroup: false,
-    tweakClockTransparency: false
+    tweakClockTransparency: false,
+    tweakGnrCountdown: false
   };
 
   const ROW_SELECTOR = 'main table tbody tr';
@@ -20,6 +21,8 @@
   const CLOCK_CELL_SELECTOR = '.table-gametime > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(1)';
   const SITE_TWEAKS_STYLE_ID = 'bfh-site-tweaks-style';
   const CLOCK_TRANSPARENT_CLASS = 'bfh-clock-transparent';
+  const GNR_COUNTDOWN_CLASS = 'bfh-gnr-countdown';
+  const GNR_TABLE_SELECTOR = 'table.table.table-rank';
   const INLINE_FILTERS_ID = 'bfh-inline-filters';
   const INLINE_STYLE_ID = 'bfh-inline-filters-style';
   const PENDING_CLASS = 'bfh-pending-filter';
@@ -81,6 +84,12 @@
         background: rgba(0, 0, 0, 0) !important;
         background-color: rgba(0, 0, 0, 0) !important;
       }
+      .${GNR_COUNTDOWN_CLASS} {
+        font-size: 11px;
+        color: #9aa0a6;
+        margin-top: 2px;
+        white-space: nowrap;
+      }
     `;
     document.documentElement.appendChild(style);
   }
@@ -113,7 +122,98 @@
     }
   }
 
-  function applySiteTweaks(config) {
+  function isBasePage() {
+    return window.location.pathname.endsWith('/base.php');
+  }
+
+  function isBattlefieldPage() {
+    return window.location.pathname.includes('/battlefield');
+  }
+
+  function formatTurnDuration(totalMinutes) {
+    if (totalMinutes <= 0) return '0m';
+
+    const weeks = Math.floor(totalMinutes / (7 * 24 * 60));
+    const days = Math.floor((totalMinutes % (7 * 24 * 60)) / (24 * 60));
+    const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+    const minutes = Math.round(totalMinutes % 60);
+
+    const parts = [];
+    if (weeks > 0) parts.push(`${weeks}w`);
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0 || parts.length === 0) parts.push(`${minutes}m`);
+
+    return parts.join(' ');
+  }
+
+  function parseTurnGain(text) {
+    const match = String(text ?? '').match(/([+-]?\d+)\s*\/\s*turn/i);
+    return match ? parseInt(match[1], 10) : null;
+  }
+
+  function getGnrRowData() {
+    const buttonSelector = 'div.hidden-md-down:nth-child(1) > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(8) > td:nth-child(2) > button:nth-child(1)';
+    const perTurnSelector = 'div.hidden-md-down:nth-child(1) > table:nth-child(2) > tbody:nth-child(1) > tr:nth-child(8) > td:nth-child(3)';
+
+    const scoreButton = document.querySelector(buttonSelector);
+    const perTurnCell = document.querySelector(perTurnSelector);
+    if (scoreButton && perTurnCell) {
+      return { perTurnCell, scoreButton };
+    }
+
+    const fallbackButton = document.querySelector('button.btn.btn-sm.btn-neutral.p-0');
+    const fallbackRow = fallbackButton?.closest('tr');
+    const fallbackPerTurn = fallbackRow?.querySelector('td:nth-child(3)') ?? fallbackRow?.querySelector('td[align="right"]');
+    if (fallbackButton && fallbackPerTurn && /\/\s*turn/i.test(fallbackPerTurn.textContent || '')) {
+      return { perTurnCell: fallbackPerTurn, scoreButton: fallbackButton };
+    }
+
+    return null;
+  }
+
+  function applyGnrCountdownTweak(enabled) {
+    const existing = document.querySelector(`.${GNR_COUNTDOWN_CLASS}`);
+    if (!enabled || !isBasePage()) {
+      existing?.remove();
+      return;
+    }
+
+    const rowData = getGnrRowData();
+    if (!rowData) {
+      existing?.remove();
+      return;
+    }
+
+    const scoreText = rowData.scoreButton.textContent?.trim().replace(/,/g, '');
+    const currentScore = parseInt(scoreText || '', 10);
+    const perTurn = parseTurnGain(rowData.perTurnCell.textContent);
+    if (!Number.isFinite(currentScore) || !Number.isFinite(perTurn)) {
+      existing?.remove();
+      return;
+    }
+
+    let countdownText = '';
+    if (currentScore >= 1000) {
+      countdownText = 'Ascend ready (>= 1,000)';
+    } else if (perTurn <= 0) {
+      countdownText = 'No gain this turn';
+    } else {
+      const remaining = 1000 - currentScore;
+      const turnsNeeded = Math.ceil(remaining / perTurn);
+      const minutesNeeded = turnsNeeded * 30;
+      countdownText = `Ascend in ${formatTurnDuration(minutesNeeded)} (${turnsNeeded} turns)`;
+    }
+
+    const countdown = existing || document.createElement('div');
+    countdown.className = GNR_COUNTDOWN_CLASS;
+    countdown.textContent = countdownText;
+    if (!existing) {
+      rowData.perTurnCell.appendChild(countdown);
+    }
+  }
+
+  function applySiteTweaks(config, { includeGnrCountdown = false } = {}) {
     if (config.tweakSidebarListGroup) {
       applySidebarListGroupTweak(true);
     } else {
@@ -124,6 +224,15 @@
       applyClockTransparencyTweak(true);
     } else {
       applyClockTransparencyTweak(false);
+    }
+
+    // GNR countdown only runs once per page load or config change, not on every DOM mutation
+    if (includeGnrCountdown) {
+      if (config.tweakGnrCountdown) {
+        applyGnrCountdownTweak(true);
+      } else {
+        applyGnrCountdownTweak(false);
+      }
     }
   }
 
@@ -490,6 +599,9 @@
   }
 
   async function injectInlineFilters() {
+    // Only inject on battlefield pages
+    if (!isBattlefieldPage()) return;
+
     await waitForBody();
     ensureInlineFilterStyles();
     const pagination = await waitForElement(PAGINATION_SELECTOR);
@@ -596,6 +708,17 @@
   }
 
   function filterRows(config) {
+    // Only run on battlefield pages
+    if (!isBattlefieldPage()) {
+      // Still need to remove pending hide class on non-battlefield pages
+      if (pendingHide) {
+        pendingHide = false;
+        document.documentElement.classList.remove(PENDING_CLASS);
+        pendingStyle.remove();
+      }
+      return;
+    }
+
     const rows = document.querySelectorAll(ROW_SELECTOR);
 
     const normalizedAllianceBlacklist = (config.allianceBlacklist || [])
@@ -692,17 +815,17 @@
       config = changes.config.newValue;
       filterRows(config);
       updateInlineFiltersUI(config);
-      applySiteTweaks(config);
+      applySiteTweaks(config, { includeGnrCountdown: true });
     }
   });
 
   // Initial run
   await waitForBody();
   injectInlineFilters();
-  applySiteTweaks(config);
+  applySiteTweaks(config, { includeGnrCountdown: true });
   filterRows(config);
 
-  // Re-run on DOM changes
+  // Re-run on DOM changes (excludes GNR countdown - that's a one-time calculation)
   const observer = new MutationObserver(() => {
     filterRows(config);
     applySiteTweaks(config);
