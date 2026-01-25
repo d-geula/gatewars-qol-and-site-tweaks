@@ -94,6 +94,15 @@
       font-size: 12px;
       display: none;
     }
+    .section-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #aaa;
+      margin: 16px 0 10px;
+      padding-top: 10px;
+      border-top: 1px solid #333;
+    }
     .hint {
       font-size: 11px;
       color: #888;
@@ -135,6 +144,18 @@
     <span class="label-text">Alliance Blacklist</span>
     <textarea id="allianceBlacklist" placeholder="Enter alliance names, one per line."></textarea>
     <div class="hint">Matches the alliance name only (text before any &quot; - Title&quot;). Case-insensitive. Exact matches only. One per line.</div>
+  </label>
+
+  <div class="section-title">Site Tweaks</div>
+
+  <label class="checkbox-label">
+    <input type="checkbox" id="tweakSidebarListGroup">
+    <span>Sidebar list: force lg-1 and hide Home Page</span>
+  </label>
+
+  <label class="checkbox-label">
+    <input type="checkbox" id="tweakClockTransparency">
+    <span>Clock transparency (0.0 background)</span>
   </label>
 
   <button id="saveSettings">Apply Settings</button>

@@ -9,11 +9,17 @@
     allianceBlacklist: [],
     hideNoAttackAction: false,
     enableRefererOverride: true,
-    refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars'
+    refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars',
+    tweakSidebarListGroup: false,
+    tweakClockTransparency: false
   };
 
   const ROW_SELECTOR = 'main table tbody tr';
   const PAGINATION_SELECTOR = 'ul.pagination.pagination-sm.justify-content-center';
+  const SIDEBAR_LIST_GROUP_SELECTOR = 'div.list-group:nth-child(1)';
+  const CLOCK_CELL_SELECTOR = '.table-gametime > tbody:nth-child(1) > tr:nth-child(1) > td:nth-child(1)';
+  const SITE_TWEAKS_STYLE_ID = 'bfh-site-tweaks-style';
+  const CLOCK_TRANSPARENT_CLASS = 'bfh-clock-transparent';
   const INLINE_FILTERS_ID = 'bfh-inline-filters';
   const INLINE_STYLE_ID = 'bfh-inline-filters-style';
   const PENDING_CLASS = 'bfh-pending-filter';
@@ -64,6 +70,61 @@
       });
       observer.observe(document.documentElement, { childList: true, subtree: true });
     });
+  }
+
+  function ensureSiteTweaksStyles() {
+    if (document.getElementById(SITE_TWEAKS_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = SITE_TWEAKS_STYLE_ID;
+    style.textContent = `
+      html.${CLOCK_TRANSPARENT_CLASS} ${CLOCK_CELL_SELECTOR} {
+        background: rgba(0, 0, 0, 0) !important;
+        background-color: rgba(0, 0, 0, 0) !important;
+      }
+    `;
+    document.documentElement.appendChild(style);
+  }
+
+  function applySidebarListGroupTweak(enabled) {
+    const listGroup = document.querySelector(SIDEBAR_LIST_GROUP_SELECTOR);
+    if (!listGroup) return;
+
+    if (enabled) {
+      listGroup.classList.remove('lg-2');
+      listGroup.classList.add('lg-1');
+    } else {
+      listGroup.classList.remove('lg-1');
+      listGroup.classList.add('lg-2');
+    }
+
+    const listItems = listGroup.querySelectorAll('a.list-group-item');
+    listItems.forEach((item) => {
+      if (!isHomePageListItem(item)) return;
+      item.style.display = enabled ? 'none' : '';
+    });
+  }
+
+  function applyClockTransparencyTweak(enabled) {
+    ensureSiteTweaksStyles();
+    if (enabled) {
+      document.documentElement.classList.add(CLOCK_TRANSPARENT_CLASS);
+    } else {
+      document.documentElement.classList.remove(CLOCK_TRANSPARENT_CLASS);
+    }
+  }
+
+  function applySiteTweaks(config) {
+    if (config.tweakSidebarListGroup) {
+      applySidebarListGroupTweak(true);
+    } else {
+      applySidebarListGroupTweak(false);
+    }
+
+    if (config.tweakClockTransparency) {
+      applyClockTransparencyTweak(true);
+    } else {
+      applyClockTransparencyTweak(false);
+    }
   }
 
   function ensureInlineFilterStyles() {
@@ -474,6 +535,15 @@
     return String(text).replace(/\s+/g, ' ').trim().toLowerCase();
   }
 
+  function isHomePageListItem(item) {
+    if (!item) return false;
+    const text = normalizeText(item.textContent || '');
+    if (text.includes('home page')) return true;
+    if (item.querySelector('.fa-home')) return true;
+    const href = item.getAttribute('href') || '';
+    return href.includes('gatewa.rs') && href.includes('base.php');
+  }
+
   function extractAllianceName(rawText) {
     const raw = String(rawText ?? '').trim();
     if (!raw) return '';
@@ -622,16 +692,21 @@
       config = changes.config.newValue;
       filterRows(config);
       updateInlineFiltersUI(config);
+      applySiteTweaks(config);
     }
   });
 
   // Initial run
   await waitForBody();
   injectInlineFilters();
+  applySiteTweaks(config);
   filterRows(config);
 
   // Re-run on DOM changes
-  const observer = new MutationObserver(() => filterRows(config));
+  const observer = new MutationObserver(() => {
+    filterRows(config);
+    applySiteTweaks(config);
+  });
 
   observer.observe(document.body, {
     childList: true,
@@ -784,6 +859,7 @@
       config = message.config || config;
       filterRows(config);
       updateInlineFiltersUI(config);
+      applySiteTweaks(config);
       sendResponse({ success: true });
       return true;
     }

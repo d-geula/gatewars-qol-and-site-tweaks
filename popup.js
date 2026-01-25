@@ -10,7 +10,9 @@ const DEFAULT_CONFIG = {
   enableRefererOverride: true,
   refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars',
   scannerSoundEnabled: true,
-  scannerSoundVolume: 60
+  scannerSoundVolume: 60,
+  tweakSidebarListGroup: false,
+  tweakClockTransparency: false
 };
 
 async function loadSettings() {
@@ -25,6 +27,8 @@ async function loadSettings() {
   document.getElementById('scannerSoundEnabled').checked = config.scannerSoundEnabled ?? true;
   document.getElementById('scannerSoundVolume').value =
     Number.isFinite(config.scannerSoundVolume) ? config.scannerSoundVolume : DEFAULT_CONFIG.scannerSoundVolume;
+  document.getElementById('tweakSidebarListGroup').checked = config.tweakSidebarListGroup ?? false;
+  document.getElementById('tweakClockTransparency').checked = config.tweakClockTransparency ?? false;
 }
 
 async function saveSettings(showMessage = true) {
@@ -41,7 +45,9 @@ async function saveSettings(showMessage = true) {
     scannerSoundVolume: Math.min(
       100,
       Math.max(0, parseInt(document.getElementById('scannerSoundVolume').value, 10) || 0)
-    )
+    ),
+    tweakSidebarListGroup: document.getElementById('tweakSidebarListGroup').checked,
+    tweakClockTransparency: document.getElementById('tweakClockTransparency').checked
   };
 
   await browser.storage.local.set({ config });
@@ -69,6 +75,8 @@ async function applyFiltersToPage(config) {
 document.getElementById('hideInactive').addEventListener('change', () => saveSettings(false));
 document.getElementById('enableRefererOverride').addEventListener('change', () => saveSettings(false));
 document.getElementById('scannerSoundEnabled').addEventListener('change', () => saveSettings(false));
+document.getElementById('tweakSidebarListGroup').addEventListener('change', () => saveSettings(false));
+document.getElementById('tweakClockTransparency').addEventListener('change', () => saveSettings(false));
 
 // Auto-apply filters on number input changes (numeric stepper) and Enter key
 function setupNumberInputAutoApply(inputId) {
