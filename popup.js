@@ -1,19 +1,19 @@
 const DEFAULT_CONFIG = {
-  threshold: 500000,
+  threshold: 650000000000,
   armySizeThreshold: 0,
   hideInactive: true,
-  enableTreasuryFilter: true,
+  enableTreasuryFilter: false,
   enableArmySizeFilter: false,
   enableAllianceFilter: false,
   allianceBlacklist: [],
-  hideNoAttackAction: false,
+  hideNoAttackAction: true,
   enableRefererOverride: true,
   refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars',
   scannerSoundEnabled: true,
-  scannerSoundVolume: 60,
-  tweakSidebarListGroup: false,
-  tweakClockTransparency: false,
-  tweakGnrCountdown: false
+  scannerSoundVolume: 100,
+  tweakSidebarListGroup: true,
+  tweakClockTransparency: true,
+  tweakGnrCountdown: true
 };
 
 async function loadSettings() {
