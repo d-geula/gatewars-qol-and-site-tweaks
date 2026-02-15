@@ -13,7 +13,8 @@ const DEFAULT_CONFIG = {
   scannerSoundVolume: 100,
   tweakSidebarListGroup: true,
   tweakClockTransparency: true,
-  tweakGnrCountdown: true
+  tweakGnrCountdown: true,
+  tweakMainTopOffset: false
 };
 
 async function loadSettings() {
@@ -31,6 +32,7 @@ async function loadSettings() {
   document.getElementById('tweakSidebarListGroup').checked = config.tweakSidebarListGroup ?? false;
   document.getElementById('tweakClockTransparency').checked = config.tweakClockTransparency ?? false;
   document.getElementById('tweakGnrCountdown').checked = config.tweakGnrCountdown ?? false;
+  document.getElementById('tweakMainTopOffset').checked = config.tweakMainTopOffset ?? false;
 }
 
 async function saveSettings(showMessage = true) {
@@ -50,7 +52,8 @@ async function saveSettings(showMessage = true) {
     ),
     tweakSidebarListGroup: document.getElementById('tweakSidebarListGroup').checked,
     tweakClockTransparency: document.getElementById('tweakClockTransparency').checked,
-    tweakGnrCountdown: document.getElementById('tweakGnrCountdown').checked
+    tweakGnrCountdown: document.getElementById('tweakGnrCountdown').checked,
+    tweakMainTopOffset: document.getElementById('tweakMainTopOffset').checked
   };
 
   await browser.storage.local.set({ config });
@@ -81,6 +84,7 @@ document.getElementById('scannerSoundEnabled').addEventListener('change', () => 
 document.getElementById('tweakSidebarListGroup').addEventListener('change', () => saveSettings(false));
 document.getElementById('tweakClockTransparency').addEventListener('change', () => saveSettings(false));
 document.getElementById('tweakGnrCountdown').addEventListener('change', () => saveSettings(false));
+document.getElementById('tweakMainTopOffset').addEventListener('change', () => saveSettings(false));
 
 // Auto-apply filters on number input changes (numeric stepper) and Enter key
 function setupNumberInputAutoApply(inputId) {

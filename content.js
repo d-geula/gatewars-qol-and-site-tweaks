@@ -12,7 +12,8 @@
     refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars',
     tweakSidebarListGroup: false,
     tweakClockTransparency: false,
-    tweakGnrCountdown: false
+    tweakGnrCountdown: false,
+    tweakMainTopOffset: false
   };
 
   const ROW_SELECTOR = 'main table tbody tr';
@@ -22,6 +23,7 @@
   const SITE_TWEAKS_STYLE_ID = 'bfh-site-tweaks-style';
   const CLOCK_TRANSPARENT_CLASS = 'bfh-clock-transparent';
   const GNR_COUNTDOWN_CLASS = 'bfh-gnr-countdown';
+  const MAIN_TOP_OFFSET_CLASS = 'bfh-main-top-offset';
   const GNR_TABLE_SELECTOR = 'table.table.table-rank';
   const INLINE_FILTERS_ID = 'bfh-inline-filters';
   const INLINE_STYLE_ID = 'bfh-inline-filters-style';
@@ -90,6 +92,9 @@
         margin-top: 2px;
         white-space: nowrap;
       }
+      html.${MAIN_TOP_OFFSET_CLASS} body > div > div > main {
+        margin-top: 50px !important;
+      }
     `;
     document.documentElement.appendChild(style);
   }
@@ -119,6 +124,15 @@
       document.documentElement.classList.add(CLOCK_TRANSPARENT_CLASS);
     } else {
       document.documentElement.classList.remove(CLOCK_TRANSPARENT_CLASS);
+    }
+  }
+
+  function applyMainTopOffsetTweak(enabled) {
+    ensureSiteTweaksStyles();
+    if (enabled) {
+      document.documentElement.classList.add(MAIN_TOP_OFFSET_CLASS);
+    } else {
+      document.documentElement.classList.remove(MAIN_TOP_OFFSET_CLASS);
     }
   }
 
@@ -224,6 +238,12 @@
       applyClockTransparencyTweak(true);
     } else {
       applyClockTransparencyTweak(false);
+    }
+
+    if (config.tweakMainTopOffset) {
+      applyMainTopOffsetTweak(true);
+    } else {
+      applyMainTopOffsetTweak(false);
     }
 
     // GNR countdown only runs once per page load or config change, not on every DOM mutation
@@ -926,54 +946,60 @@
     await saveScannerState(state);
     updateInlineScannerProgress(currentPage, state.endPage);
 
-    // Wait for DOM to settle, then apply filters and check
-    // Random wait 1-3 seconds
+    // Brief wait for DOM to settle, then check immediately
+    const domSettleMs = 200;
+    await new Promise(r => setTimeout(r, domSettleMs));
+
+    // Re-check state in case user stopped
+    const freshState = await loadScannerState();
+    if (!freshState?.active) {
+      console.log('[Scanner] Stopped during wait');
+      return;
+    }
+
+    // Apply filters first
+    filterRows(config);
+
+    // Count visible valid players
+    const { total, visible, visiblePlayers } = countVisiblePlayers();
+    console.log(`[Scanner] Page ${currentPage}: ${visible}/${total} valid players visible`);
+    if (visiblePlayers.length > 0) {
+      console.log(`[Scanner] Visible players:`, visiblePlayers);
+    }
+
+    if (visible > 0) {
+      // Found matches! Stop immediately
+      console.log(`[Scanner] ✓ MATCH FOUND on page ${currentPage}!`);
+      await clearScannerState();
+      sendStatus('found', currentPage);
+      setInlineScannerRunning(false);
+      return;
+    }
+
+    // No matches, check if we've reached the end
+    if (currentPage >= freshState.endPage) {
+      console.log(`[Scanner] Reached end of range (page ${currentPage})`);
+      await clearScannerState();
+      sendStatus('complete', currentPage);
+      setInlineScannerRunning(false);
+      return;
+    }
+
+    // No matches, need to navigate to next page - use random wait to avoid hammering
     const waitTime = 1000 + Math.random() * 2000;
-    console.log(`[Scanner] Waiting ${Math.round(waitTime)}ms before checking...`);
+    console.log(`[Scanner] No matches, waiting ${Math.round(waitTime)}ms before next page...`);
+    await new Promise(r => setTimeout(r, waitTime));
 
-    setTimeout(async () => {
-      // Re-check state in case user stopped
-      const freshState = await loadScannerState();
-      if (!freshState?.active) {
-        console.log('[Scanner] Stopped during wait');
-        return;
-      }
+    const stillActive = await loadScannerState();
+    if (!stillActive?.active) {
+      console.log('[Scanner] Stopped during wait');
+      return;
+    }
 
-      // Apply filters first
-      filterRows(config);
-
-      // Count visible valid players
-      const { total, visible, visiblePlayers } = countVisiblePlayers();
-      console.log(`[Scanner] Page ${currentPage}: ${visible}/${total} valid players visible`);
-      if (visiblePlayers.length > 0) {
-        console.log(`[Scanner] Visible players:`, visiblePlayers);
-      }
-
-      if (visible > 0) {
-        // Found matches!
-        console.log(`[Scanner] ✓ MATCH FOUND on page ${currentPage}!`);
-        await clearScannerState();
-        sendStatus('found', currentPage);
-        setInlineScannerRunning(false);
-        return;
-      }
-
-      // No matches, check if we've reached the end
-      if (currentPage >= freshState.endPage) {
-        console.log(`[Scanner] Reached end of range (page ${currentPage})`);
-        await clearScannerState();
-        sendStatus('complete', currentPage);
-        setInlineScannerRunning(false);
-        return;
-      }
-
-      // Navigate to next page
-      const nextPage = currentPage + 1;
-      console.log(`[Scanner] No matches, navigating to page ${nextPage}...`);
-      
-      const baseUrl = window.location.href.split('?')[0];
-      window.location.href = `${baseUrl}?page=${nextPage}`;
-    }, waitTime);
+    const nextPage = currentPage + 1;
+    console.log(`[Scanner] Navigating to page ${nextPage}...`);
+    const baseUrl = window.location.href.split('?')[0];
+    window.location.href = `${baseUrl}?page=${nextPage}`;
   }
 
   // Listen for messages from popup
