@@ -41,6 +41,9 @@
   const GNR_TABLE_SELECTOR = 'table.table.table-rank';
   const INLINE_FILTERS_ID = 'bfh-inline-filters';
   const INLINE_STYLE_ID = 'bfh-inline-filters-style';
+  const PROFILE_COPY_STYLE_ID = 'bfh-profile-copy-style';
+  const PROFILE_COPY_WRAPPER_ID = 'bfh-profile-copy-actions';
+  const PROFILE_COPY_BUTTON_CLASS = 'bfh-profile-copy-button';
   const PENDING_CLASS = 'bfh-pending-filter';
   const INLINE_WRAPPER_CLASS = 'bfh-inline-wrap';
   const SCANNER_STATE_PREFIX = 'scannerState:';
@@ -245,6 +248,156 @@
     }
   }
 
+  function ensureProfileCopyStyles() {
+    if (document.getElementById(PROFILE_COPY_STYLE_ID)) return;
+    const style = document.createElement('style');
+    style.id = PROFILE_COPY_STYLE_ID;
+    style.textContent = `
+      #${PROFILE_COPY_WRAPPER_ID} {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        margin-left: 8px;
+      }
+      #${PROFILE_COPY_WRAPPER_ID} .${PROFILE_COPY_BUTTON_CLASS} {
+        font-size: 11px;
+        line-height: 1;
+        padding: 2px 6px;
+        cursor: pointer;
+      }
+    `;
+    document.documentElement.appendChild(style);
+  }
+
+  function isPlayerProfilePage() {
+    if (!window.location.pathname.endsWith('/stats.php')) return false;
+    const id = new URLSearchParams(window.location.search).get('id') || '';
+    return /^\d+$/.test(id.trim());
+  }
+
+  function getPlayerStatsHeading() {
+    const headingXPath = '/html/body/div/div/main/div[2]/div[1]/table/tbody/tr[1]/th/h5';
+    const heading = queryByXPath(headingXPath);
+    if (heading) return heading;
+
+    const candidates = document.querySelectorAll('main h5');
+    for (const candidate of candidates) {
+      if (normalizeText(candidate.textContent || '') === 'player stats') {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  function getFirstTextValue(element) {
+    if (!element) return '';
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const value = String(walker.currentNode.nodeValue || '').replace(/\s+/g, ' ').trim();
+      if (value) return value;
+    }
+    return '';
+  }
+
+  function getProfileName() {
+    const nameCellXPath = '/html/body/div/div/main/div[2]/div[1]/table/tbody/tr[2]/td[2]';
+    const nameCell = queryByXPath(nameCellXPath);
+    if (nameCell) return getFirstTextValue(nameCell);
+
+    const rows = document.querySelectorAll('main table tr');
+    for (const row of rows) {
+      const label = normalizeText(row.querySelector('td:first-child, th:first-child')?.textContent || '');
+      if (label === 'name' || label.startsWith('name:')) {
+        return getFirstTextValue(row.querySelector('td:nth-child(2)'));
+      }
+    }
+
+    return '';
+  }
+
+  function getProfileId() {
+    return (new URLSearchParams(window.location.search).get('id') || '').trim();
+  }
+
+  function getProfileTreasuryAmount() {
+    const treasuryXPath = '/html/body/div/div/main/div[2]/div[1]/table/tbody/tr[8]/td[2]/button/x';
+    const treasuryNode = queryByXPath(treasuryXPath);
+    const raw = String(treasuryNode?.textContent || '').trim();
+    if (!raw) return '';
+    const unreversed = raw.split('').reverse().join('');
+    const valueMatch = unreversed.match(/[\d,]+/);
+    return valueMatch ? valueMatch[0] : '';
+  }
+
+  async function copyTextToClipboard(value) {
+    const text = String(value || '');
+    if (!text) return false;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+    }
+
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', 'readonly');
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      return copied;
+    } catch {
+      return false;
+    }
+  }
+
+  function buildProfileCopyButton(label, getValue) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = PROFILE_COPY_BUTTON_CLASS;
+    button.textContent = label;
+
+    let resetTimer = null;
+    button.addEventListener('click', async () => {
+      const value = getValue();
+      const copied = value ? await copyTextToClipboard(value) : false;
+      button.textContent = copied ? 'Copied' : 'N/A';
+      if (resetTimer) {
+        clearTimeout(resetTimer);
+      }
+      resetTimer = window.setTimeout(() => {
+        button.textContent = label;
+      }, 1000);
+    });
+
+    return button;
+  }
+
+  function injectProfileCopyButtons() {
+    if (!isPlayerProfilePage()) return;
+
+    const heading = getPlayerStatsHeading();
+    if (!heading) return;
+
+    if (document.getElementById(PROFILE_COPY_WRAPPER_ID)) return;
+
+    ensureProfileCopyStyles();
+
+    const wrapper = document.createElement('span');
+    wrapper.id = PROFILE_COPY_WRAPPER_ID;
+    wrapper.appendChild(buildProfileCopyButton('Copy Name', getProfileName));
+    wrapper.appendChild(buildProfileCopyButton('Copy Treasury', getProfileTreasuryAmount));
+    wrapper.appendChild(buildProfileCopyButton('Copy ID', getProfileId));
+    heading.appendChild(wrapper);
+  }
+
   function isBasePage() {
     return window.location.pathname.endsWith('/base.php');
   }
@@ -337,6 +490,8 @@
   }
 
   function applySiteTweaks(config, { includeGnrCountdown = false } = {}) {
+    injectProfileCopyButtons();
+
     if (config.tweakSidebarListGroup) {
       applySidebarListGroupTweak(true);
     } else {
