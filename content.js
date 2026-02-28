@@ -10,11 +10,25 @@
     hideNoAttackAction: false,
     enableRefererOverride: true,
     refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars',
+    autoFillLoginEnabled: false,
+    autoFillLoginUsername: '',
+    autoFillLoginEmail: '',
+    autoFillLoginPassword: '',
     tweakSidebarListGroup: false,
     tweakClockTransparency: false,
     tweakGnrCountdown: false,
     tweakMainTopOffset: false
   };
+  const CONFIG_KEY = 'config';
+  const AUTO_FILL_CLICK_DELAY_MS = 250;
+  const AUTO_FILL_LOGIN_BUTTON_SELECTORS = [
+    'div.row:nth-child(5) > div:nth-child(2) > button:nth-child(1)',
+    'button[data-target="#registerModal"]',
+    'button[data-bs-target="#registerModal"]'
+  ];
+  const AUTO_FILL_LOGIN_BUTTON_XPATHS = [
+    '/html/body/div[3]/div/div/div[2]/div[3]/div[2]/button'
+  ];
 
   const ROW_SELECTOR = 'main table tbody tr';
   const PAGINATION_SELECTOR = 'ul.pagination.pagination-sm.justify-content-center';
@@ -54,11 +68,106 @@
 
   async function getConfig() {
     try {
-      const result = await browser.storage.local.get('config');
-      return { ...DEFAULT_CONFIG, ...result.config };
+      const localResult = await browser.storage.local.get(CONFIG_KEY);
+      if (localResult?.[CONFIG_KEY]) {
+        return { ...DEFAULT_CONFIG, ...localResult[CONFIG_KEY] };
+      }
+
+      return DEFAULT_CONFIG;
     } catch {
       return DEFAULT_CONFIG;
     }
+  }
+
+  async function setDurableConfig(nextConfig) {
+    await browser.storage.local.set({ [CONFIG_KEY]: nextConfig });
+  }
+
+  function isMainRootPage() {
+    return window.location.origin === 'https://main.gatewa.rs' &&
+      (window.location.pathname === '' || window.location.pathname === '/') &&
+      window.location.search === '' &&
+      window.location.hash === '';
+  }
+
+  function queryByXPath(xpath) {
+    return document.evaluate(
+      xpath,
+      document,
+      null,
+      XPathResult.FIRST_ORDERED_NODE_TYPE,
+      null
+    ).singleNodeValue;
+  }
+
+  function findLoginButton() {
+    for (const selector of AUTO_FILL_LOGIN_BUTTON_SELECTORS) {
+      const button = document.querySelector(selector);
+      if (button) return button;
+    }
+    for (const xpath of AUTO_FILL_LOGIN_BUTTON_XPATHS) {
+      const button = queryByXPath(xpath);
+      if (button) return button;
+    }
+
+    const textFallbackButtons = Array.from(document.querySelectorAll('button'));
+    return textFallbackButtons.find((button) => /log\s*in|login/i.test(button.textContent || '')) || null;
+  }
+
+  async function waitForLoginButton(timeoutMs = 2000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const button = findLoginButton();
+      if (button) return button;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return null;
+  }
+
+  async function waitForLoginFields(timeoutMs = 2000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      const username = document.querySelector('#usname');
+      const email = document.querySelector('#usemail');
+      const password = document.querySelector('#uspass');
+      if (username && email && password) {
+        return { username, email, password };
+      }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    return null;
+  }
+
+  function setInputValue(input, value) {
+    input.focus();
+    input.value = value;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  let autoFillAttempted = false;
+  async function tryAutoFillLogin(currentConfig) {
+    if (autoFillAttempted || !isMainRootPage()) return;
+    if (!currentConfig.autoFillLoginEnabled) return;
+
+    const username = String(currentConfig.autoFillLoginUsername ?? '');
+    const email = String(currentConfig.autoFillLoginEmail ?? '');
+    const password = String(currentConfig.autoFillLoginPassword ?? '');
+    if (!username || !email || !password) return;
+
+    autoFillAttempted = true;
+    const loginButton = await waitForLoginButton();
+    if (!loginButton) return;
+
+    loginButton.click();
+    await new Promise((resolve) => setTimeout(resolve, AUTO_FILL_CLICK_DELAY_MS));
+
+    const fields = await waitForLoginFields();
+    if (!fields) return;
+
+    setInputValue(fields.username, username);
+    setInputValue(fields.email, email);
+    setInputValue(fields.password, password);
   }
 
   async function waitForElement(selector) {
@@ -398,7 +507,7 @@
     const inlineConfig = readInlineFiltersConfig(container);
     const newConfig = { ...config, ...inlineConfig };
     config = newConfig;
-    await browser.storage.local.set({ config: newConfig });
+    await setDurableConfig(newConfig);
     filterRows(newConfig);
   }
 
@@ -832,10 +941,11 @@
   // Listen for config changes from popup
   browser.storage.onChanged.addListener((changes) => {
     if (changes.config) {
-      config = changes.config.newValue;
+      config = { ...DEFAULT_CONFIG, ...(changes.config.newValue || {}) };
       filterRows(config);
       updateInlineFiltersUI(config);
       applySiteTweaks(config, { includeGnrCountdown: true });
+      tryAutoFillLogin(config);
     }
   });
 
@@ -843,6 +953,7 @@
   await waitForBody();
   injectInlineFilters();
   applySiteTweaks(config, { includeGnrCountdown: true });
+  tryAutoFillLogin(config);
   filterRows(config);
 
   // Re-run on DOM changes (excludes GNR countdown - that's a one-time calculation)
@@ -1009,6 +1120,7 @@
       filterRows(config);
       updateInlineFiltersUI(config);
       applySiteTweaks(config);
+      tryAutoFillLogin(config);
       sendResponse({ success: true });
       return true;
     }

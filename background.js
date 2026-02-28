@@ -2,17 +2,27 @@ const DEFAULT_CONFIG = {
   enableRefererOverride: true,
   refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars',
   scannerSoundEnabled: true,
-  scannerSoundVolume: 60
+  scannerSoundVolume: 100,
+  autoFillLoginEnabled: false,
+  autoFillLoginUsername: '',
+  autoFillLoginEmail: '',
+  autoFillLoginPassword: ''
 };
 
+const CONFIG_KEY = 'config';
 let config = { ...DEFAULT_CONFIG };
 const SCANNER_ALERT_SOUND_URL = browser.runtime.getURL('sounds/pop-alert.ogg');
 const SCANNER_COMPLETE_SOUND_URL = browser.runtime.getURL('sounds/long-pop.ogg');
 
 async function loadConfig() {
   try {
-    const result = await browser.storage.local.get('config');
-    config = { ...DEFAULT_CONFIG, ...(result.config || {}) };
+    const localResult = await browser.storage.local.get(CONFIG_KEY);
+    if (localResult?.[CONFIG_KEY]) {
+      config = { ...DEFAULT_CONFIG, ...(localResult[CONFIG_KEY] || {}) };
+      return;
+    }
+
+    config = { ...DEFAULT_CONFIG };
   } catch {
     config = { ...DEFAULT_CONFIG };
   }

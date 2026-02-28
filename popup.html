@@ -29,7 +29,9 @@
       margin-bottom: 6px;
       font-size: 13px;
     }
-    input[type="number"] {
+    input[type="number"],
+    input[type="text"],
+    input[type="password"] {
       width: 100%;
       padding: 8px;
       box-sizing: border-box;
@@ -39,7 +41,9 @@
       border-radius: 4px;
       font-size: 14px;
     }
-    input[type="number"]:focus {
+    input[type="number"]:focus,
+    input[type="text"]:focus,
+    input[type="password"]:focus {
       outline: none;
       border-color: #ff6600;
     }
@@ -94,6 +98,13 @@
       font-size: 12px;
       display: none;
     }
+    .meta {
+      color: #888;
+      text-align: center;
+      margin-top: 6px;
+      font-size: 11px;
+      min-height: 14px;
+    }
     .section-title {
       font-size: 11px;
       text-transform: uppercase;
@@ -107,6 +118,37 @@
       font-size: 11px;
       color: #888;
       margin-top: 4px;
+    }
+    details {
+      margin: -4px 0 14px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #151515;
+    }
+    summary {
+      cursor: pointer;
+      font-size: 12px;
+      padding: 10px;
+      color: #ddd;
+      user-select: none;
+    }
+    .details-content {
+      border-top: 1px solid #333;
+      padding: 10px;
+    }
+    .button-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .button-row button {
+      flex: 1;
+      margin-top: 0;
+      padding: 8px 10px;
+      font-size: 12px;
+    }
+    #importSettingsInput {
+      display: none;
     }
   </style>
 </head>
@@ -140,6 +182,30 @@
     <div class="hint">Used for direct battlefield page loads.</div>
   </label>
 
+  <label class="checkbox-label">
+    <input type="checkbox" id="autoFillLoginEnabled">
+    <span>Auto-fill Login Details</span>
+  </label>
+
+  <details>
+    <summary>Login details (root page only)</summary>
+    <div class="details-content">
+      <label>
+        <span class="label-text">Username</span>
+        <input type="text" id="autoFillLoginUsername" autocomplete="off" placeholder="Username">
+      </label>
+      <label>
+        <span class="label-text">Email</span>
+        <input type="text" id="autoFillLoginEmail" autocomplete="off" placeholder="Email">
+      </label>
+      <label>
+        <span class="label-text">Password</span>
+        <input type="password" id="autoFillLoginPassword" autocomplete="off" placeholder="Password">
+      </label>
+      <div class="hint">Used only on https://main.gatewa.rs and https://main.gatewa.rs/.</div>
+    </div>
+  </details>
+
   <label>
     <span class="label-text">Alliance Blacklist</span>
     <textarea id="allianceBlacklist" placeholder="Enter alliance names, one per line."></textarea>
@@ -168,8 +234,16 @@
     <span>Main content top offset</span>
   </label>
 
+  <div class="section-title">Settings Backup</div>
+  <div class="button-row">
+    <button id="exportSettings" type="button">Export JSON</button>
+    <button id="importSettings" type="button">Import JSON</button>
+  </div>
+  <input id="importSettingsInput" type="file" accept="application/json,.json">
+
   <button id="saveSettings">Apply Settings</button>
   <div class="saved" id="savedSettingsMsg">✓ Settings applied!</div>
+  <div class="meta" id="lastSavedAt">Last saved: never</div>
 
   <script src="popup.js"></script>
 </body>
