@@ -30,6 +30,9 @@ This repo currently has no formal build/lint/test toolchain.
 
 ### Lint
 - No lint config is committed in this repo.
+- Optional ad-hoc syntax check with Bun (single file or multiple scripts):
+  - Single file: `bun build "content.js" --target=browser --outdir "/tmp/bfh-bun-check"`
+  - Multiple files: `bun build "content.js" "popup.js" "background.js" --target=browser --outdir "/tmp/bfh-bun-check"`
 - Optional ad-hoc lint (only if ESLint is available in your environment):
   - `bunx eslint "*.js"`
 - Do not add lint tooling/config unless explicitly requested.
