@@ -2,8 +2,8 @@
   const DEFAULT_CONFIG = {
     threshold: 0,
     armySizeThreshold: 0,
-    hideInactive: true,
-    enableTreasuryFilter: true,
+    hideInactive: false,
+    enableTreasuryFilter: false,
     enableArmySizeFilter: false,
     enableAllianceFilter: false,
     allianceBlacklist: [],
@@ -14,10 +14,10 @@
     autoFillLoginUsername: '',
     autoFillLoginEmail: '',
     autoFillLoginPassword: '',
-    tweakSidebarListGroup: false,
-    tweakClockTransparency: false,
+    tweakSidebarListGroup: true,
+    tweakClockTransparency: true,
     tweakGnrCountdown: false,
-    tweakMainTopOffset: false
+    tweakMainTopOffset: true
   };
   const CONFIG_KEY = 'config';
   const AUTO_FILL_CLICK_DELAY_MS = 250;
@@ -1082,7 +1082,7 @@
       activeFilters.push(`alliances: ${config.allianceBlacklist.length}`);
     }
     if (config.hideNoAttackAction) activeFilters.push('no-attack-action');
-    
+
     console.log(
       `[Battlefield Filter] ${visiblePlayers}/${totalPlayers} players visible ` +
       `(hidden ${hiddenByFilter} by filters: ${activeFilters.join(', ') || 'none'})`
@@ -1286,7 +1286,7 @@
   (async () => {
     // Wait a bit for DOM to be ready
     await new Promise(r => setTimeout(r, 1000));
-    
+
     const state = await loadScannerState();
     if (state?.active) {
       console.log('[Scanner] Resuming scan after page load:', state);
