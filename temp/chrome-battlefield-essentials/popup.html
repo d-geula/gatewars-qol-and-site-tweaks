@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Battlefield Essentials</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      body {
+        margin: 0;
+        padding: 14px;
+        width: 320px;
+        font: 13px/1.4 "Segoe UI", Tahoma, sans-serif;
+        background: #10161d;
+        color: #eef3f8;
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 16px;
+      }
+
+      p {
+        margin: 0 0 12px;
+        color: #c2cfdb;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      input[type="text"] {
+        box-sizing: border-box;
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #3b4753;
+        border-radius: 6px;
+        background: #18212b;
+        color: inherit;
+      }
+
+      .toggle {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .status {
+        min-height: 18px;
+        margin-top: 10px;
+        color: #8fd3a9;
+      }
+
+      .hint {
+        margin-top: 12px;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Battlefield Essentials</h1>
+    <label class="toggle">
+      <input type="checkbox" id="stabilizeSiteLayout">
+      Stabilize site layout
+    </label>
+    <label class="toggle">
+      <input type="checkbox" id="transparentGameTimePanel">
+      Transparent GameTime panel
+    </label>
+    <label class="toggle">
+      <input type="checkbox" id="enableRefererOverride">
+      Enable referer override
+    </label>
+    <label for="refererOverrideUrl">Referer URL</label>
+    <input
+      type="text"
+      id="refererOverrideUrl"
+      placeholder="https://main.gatewa.rs/base.php?game=gatewars"
+    >
+    <div class="status" id="status"></div>
+    <p class="hint">Battlefield filters are configured directly on battlefield pages.</p>
+    <script src="popup.js"></script>
+  </body>
+</html>

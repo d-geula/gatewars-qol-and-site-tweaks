@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Battlefield Highlighter Essentials",
+  "version": "0.1.0",
+  "description": "Minimal battlefield filters and referer override for main.gatewa.rs in Chrome.",
+  "permissions": [
+    "storage",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "https://main.gatewa.rs/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "Battlefield Essentials",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://main.gatewa.rs/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start"
+    }
+  ]
+}
