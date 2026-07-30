@@ -7,6 +7,7 @@ const DEFAULT_CONFIG = {
   hideNoAttackAction: false,
   stabilizeSiteLayout: true,
   transparentGameTimePanel: true,
+  enableSkillTargetUpgrades: false,
   enableRefererOverride: true,
   refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars'
 };
@@ -25,6 +26,9 @@ function normalizeConfig(rawConfig = {}) {
     hideNoAttackAction: Boolean(rawConfig.hideNoAttackAction),
     stabilizeSiteLayout: Boolean(rawConfig.stabilizeSiteLayout ?? DEFAULT_CONFIG.stabilizeSiteLayout),
     transparentGameTimePanel: Boolean(rawConfig.transparentGameTimePanel ?? DEFAULT_CONFIG.transparentGameTimePanel),
+    enableSkillTargetUpgrades: Boolean(
+      rawConfig.enableSkillTargetUpgrades ?? DEFAULT_CONFIG.enableSkillTargetUpgrades
+    ),
     enableRefererOverride: Boolean(rawConfig.enableRefererOverride ?? DEFAULT_CONFIG.enableRefererOverride),
     refererOverrideUrl: String(rawConfig.refererOverrideUrl ?? DEFAULT_CONFIG.refererOverrideUrl).trim() ||
       DEFAULT_CONFIG.refererOverrideUrl
@@ -56,6 +60,7 @@ function readForm(config) {
     ...config,
     stabilizeSiteLayout: document.getElementById('stabilizeSiteLayout').checked,
     transparentGameTimePanel: document.getElementById('transparentGameTimePanel').checked,
+    enableSkillTargetUpgrades: document.getElementById('enableSkillTargetUpgrades').checked,
     enableRefererOverride: document.getElementById('enableRefererOverride').checked,
     refererOverrideUrl: document.getElementById('refererOverrideUrl').value.trim()
   };
@@ -64,6 +69,7 @@ function readForm(config) {
 function writeForm(config) {
   document.getElementById('stabilizeSiteLayout').checked = config.stabilizeSiteLayout;
   document.getElementById('transparentGameTimePanel').checked = config.transparentGameTimePanel;
+  document.getElementById('enableSkillTargetUpgrades').checked = config.enableSkillTargetUpgrades;
   document.getElementById('enableRefererOverride').checked = config.enableRefererOverride;
   document.getElementById('refererOverrideUrl').value = config.refererOverrideUrl;
 }
@@ -82,6 +88,12 @@ async function initialize() {
     config = await saveConfig(readForm(config));
     writeForm(config);
     setStatus('Saved');
+  });
+
+  document.getElementById('enableSkillTargetUpgrades').addEventListener('change', async () => {
+    config = await saveConfig(readForm(config));
+    writeForm(config);
+    setStatus('Saved; reload Training');
   });
 
   document.getElementById('enableRefererOverride').addEventListener('change', async () => {

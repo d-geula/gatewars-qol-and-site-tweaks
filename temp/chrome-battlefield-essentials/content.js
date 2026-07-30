@@ -8,6 +8,7 @@
     hideNoAttackAction: false,
     stabilizeSiteLayout: true,
     transparentGameTimePanel: true,
+    enableSkillTargetUpgrades: false,
     enableRefererOverride: true,
     refererOverrideUrl: 'https://main.gatewa.rs/base.php?game=gatewars'
   };
@@ -19,6 +20,8 @@
   const INLINE_STYLE_ID = 'bfh-inline-filters-style';
   const SITE_LAYOUT_STYLE_ID = 'bfh-stabilize-site-layout-style';
   const GAME_TIME_PANEL_STYLE_ID = 'bfh-transparent-game-time-panel-style';
+  const SKILL_UPGRADES_STYLE_ID = 'bfh-skill-target-upgrades-style';
+  const SKILL_UPGRADE_STATE_KEY = 'bfh-skill-target-upgrade';
   const FORUMS_LINK_SELECTOR = 'a[href="https://talk.gatewa.rs"], a[href="https://talk.gatewa.rs/"]';
   const HEADER_BANNER_SECTION_SELECTOR = 'nav.navbar.navbar-inverse.fixed-top > section';
   const HEADER_BANNER_SELECTOR = `${HEADER_BANNER_SECTION_SELECTOR} > img[src*="banner-"]`;
@@ -53,6 +56,9 @@
       hideNoAttackAction: Boolean(rawConfig.hideNoAttackAction),
       stabilizeSiteLayout: Boolean(rawConfig.stabilizeSiteLayout ?? DEFAULT_CONFIG.stabilizeSiteLayout),
       transparentGameTimePanel: Boolean(rawConfig.transparentGameTimePanel ?? DEFAULT_CONFIG.transparentGameTimePanel),
+      enableSkillTargetUpgrades: Boolean(
+        rawConfig.enableSkillTargetUpgrades ?? DEFAULT_CONFIG.enableSkillTargetUpgrades
+      ),
       enableRefererOverride: Boolean(rawConfig.enableRefererOverride ?? DEFAULT_CONFIG.enableRefererOverride),
       refererOverrideUrl: String(rawConfig.refererOverrideUrl ?? DEFAULT_CONFIG.refererOverrideUrl).trim() ||
         DEFAULT_CONFIG.refererOverrideUrl
@@ -77,6 +83,10 @@
 
   function isBattlefieldPage() {
     return window.location.pathname.includes('/battlefield');
+  }
+
+  function isTrainingPage() {
+    return window.location.pathname.endsWith('/train.php');
   }
 
   function applySiteLayoutStabilization(config) {
@@ -162,6 +172,215 @@
       }
     `;
     document.documentElement.appendChild(style);
+  }
+
+  function ensureSkillUpgradeStyles() {
+    if (document.getElementById(SKILL_UPGRADES_STYLE_ID)) return;
+
+    const style = document.createElement('style');
+    style.id = SKILL_UPGRADES_STYLE_ID;
+    style.textContent = `
+      .bfh-skill-target-controls {
+        display: grid;
+        gap: 3px;
+        margin-top: 5px;
+        font-size: 12px;
+      }
+      .bfh-skill-target-main {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+      }
+      .bfh-skill-target-input {
+        box-sizing: border-box;
+        width: 58px;
+        height: 28px;
+        padding: 3px 5px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+      }
+      .bfh-skill-target-button {
+        min-width: 68px;
+        height: 28px;
+        padding: 3px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        color: inherit;
+        cursor: pointer;
+      }
+      .bfh-skill-target-button:disabled {
+        cursor: default;
+        opacity: 0.45;
+      }
+      .bfh-skill-target-status {
+        color: #c8d3df;
+      }
+    `;
+    document.documentElement.appendChild(style);
+  }
+
+  function readSkillUpgradeState() {
+    try {
+      return JSON.parse(window.sessionStorage.getItem(SKILL_UPGRADE_STATE_KEY) || 'null');
+    } catch (error) {
+      console.warn('[Skill Upgrade] Ignoring invalid saved progress.', error);
+      return null;
+    }
+  }
+
+  function saveSkillUpgradeState(state) {
+    if (state) {
+      window.sessionStorage.setItem(SKILL_UPGRADE_STATE_KEY, JSON.stringify(state));
+    } else {
+      window.sessionStorage.removeItem(SKILL_UPGRADE_STATE_KEY);
+    }
+  }
+
+  function parseSkillLevel(row) {
+    const match = row?.textContent.match(/\bLevel\s+(\d+)\b/i);
+    return match ? parseInt(match[1], 10) : null;
+  }
+
+  function findSkillRow(submitName) {
+    const forms = document.querySelectorAll(`form[action="train2.php"] input[name="${submitName}"]`);
+    for (const submit of forms) {
+      const row = submit.closest('tr');
+      if (row && row.getClientRects().length > 0) return row;
+    }
+    return forms[0]?.closest('tr') || null;
+  }
+
+  function getSkillTargetControls(submitName) {
+    return document.querySelector(`.bfh-skill-target-controls[data-submit-name="${submitName}"]`);
+  }
+
+  function setSkillUpgradeStatus(submitName, message) {
+    const status = getSkillTargetControls(submitName)?.querySelector('.bfh-skill-target-status');
+    if (status) {
+      status.textContent = message;
+    }
+  }
+
+  function updateSkillUpgradeButtons(activeSubmitName = null) {
+    document.querySelectorAll('.bfh-skill-target-controls').forEach((controls) => {
+      const button = controls.querySelector('.bfh-skill-target-button');
+      const isActive = controls.dataset.submitName === activeSubmitName;
+      button.textContent = isActive ? 'Cancel' : 'Upgrade';
+      button.disabled = Boolean(activeSubmitName) && !isActive;
+    });
+  }
+
+  function submitNextSkillUpgrade(state) {
+    const row = findSkillRow(state.submitName);
+    const currentLevel = parseSkillLevel(row);
+    const submit = row?.querySelector(`input[name="${state.submitName}"]`);
+
+    if (currentLevel === null || !submit?.form) {
+      saveSkillUpgradeState(null);
+      updateSkillUpgradeButtons();
+      setSkillUpgradeStatus(state.submitName, 'Stopped: upgrade control not found.');
+      return;
+    }
+
+    if (Number.isInteger(state.lastLevel) && currentLevel <= state.lastLevel) {
+      saveSkillUpgradeState(null);
+      updateSkillUpgradeButtons();
+      setSkillUpgradeStatus(
+        state.submitName,
+        `Stopped at level ${currentLevel}; the last upgrade did not complete.`
+      );
+      return;
+    }
+
+    if (currentLevel >= state.targetLevel) {
+      saveSkillUpgradeState(null);
+      updateSkillUpgradeButtons();
+      setSkillUpgradeStatus(state.submitName, `Target level ${state.targetLevel} reached.`);
+      return;
+    }
+
+    saveSkillUpgradeState({ ...state, lastLevel: currentLevel });
+    updateSkillUpgradeButtons(state.submitName);
+    setSkillUpgradeStatus(state.submitName, `Upgrading ${currentLevel} → ${currentLevel + 1}…`);
+    window.setTimeout(() => submit.form.requestSubmit(submit), 500);
+  }
+
+  function buildSkillTargetControls(skill) {
+    const controls = document.createElement('div');
+    controls.className = 'bfh-skill-target-controls';
+    controls.dataset.submitName = skill.submitName;
+    controls.innerHTML = `
+      <div class="bfh-skill-target-main">
+        <span>Target</span>
+        <input
+          type="number"
+          class="bfh-skill-target-input"
+          aria-label="Target level"
+          min="${skill.currentLevel + 1}"
+          step="1"
+          value="${skill.currentLevel + 1}"
+        >
+        <button type="button" class="bfh-skill-target-button">Upgrade</button>
+      </div>
+      <span class="bfh-skill-target-status"></span>
+    `;
+
+    const input = controls.querySelector('.bfh-skill-target-input');
+    const button = controls.querySelector('.bfh-skill-target-button');
+    button.addEventListener('click', () => {
+      const activeState = readSkillUpgradeState();
+      if (activeState) {
+        if (activeState.submitName === skill.submitName) {
+          saveSkillUpgradeState(null);
+          updateSkillUpgradeButtons();
+          setSkillUpgradeStatus(skill.submitName, 'Upgrade cancelled.');
+        }
+        return;
+      }
+
+      const targetLevel = parseInt(input.value, 10);
+      if (!Number.isInteger(targetLevel) || targetLevel <= skill.currentLevel) {
+        setSkillUpgradeStatus(skill.submitName, `Choose a level above ${skill.currentLevel}.`);
+        return;
+      }
+
+      const state = { submitName: skill.submitName, targetLevel };
+      saveSkillUpgradeState(state);
+      submitNextSkillUpgrade(state);
+    });
+
+    return controls;
+  }
+
+  async function injectSkillTargetUpgrades(config) {
+    if (!isTrainingPage() || !config.enableSkillTargetUpgrades) return;
+
+    await waitForBody();
+    await waitForElement('form[action="train2.php"] input[name="antispyupgrade"]');
+    ensureSkillUpgradeStyles();
+
+    const skills = [
+      { submitName: 'spyupgrade' },
+      { submitName: 'antispyupgrade' }
+    ];
+
+    skills.forEach((skill) => {
+      const row = findSkillRow(skill.submitName);
+      const currentLevel = parseSkillLevel(row);
+      const levelCell = row?.querySelector('td:nth-child(2)');
+      if (!levelCell || currentLevel === null || levelCell.querySelector('.bfh-skill-target-controls')) return;
+
+      levelCell.appendChild(buildSkillTargetControls({ ...skill, currentLevel }));
+    });
+
+    const activeState = readSkillUpgradeState();
+    if (activeState) {
+      submitNextSkillUpgrade(activeState);
+    }
   }
 
   function ensureInlineStyles() {
@@ -545,12 +764,14 @@
       config = normalizeConfig(changes[CONFIG_KEY].newValue || {});
       applySiteLayoutStabilization(config);
       applyGameTimePanelTransparency(config);
+      injectSkillTargetUpgrades(config);
       updateInlineFiltersUI(config);
       filterRows(config);
     }
   });
 
   await injectInlineFilters();
+  await injectSkillTargetUpgrades(config);
   applySiteLayoutStabilization(config);
   applyGameTimePanelTransparency(config);
   filterRows(config);
