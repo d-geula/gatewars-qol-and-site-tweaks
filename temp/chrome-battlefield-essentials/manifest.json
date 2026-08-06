@@ -23,9 +23,26 @@
         "https://main.gatewa.rs/*"
       ],
       "js": [
+        "vendor/ort.wasm.min.js",
+        "pin-autofill.js",
         "content.js"
       ],
       "run_at": "document_start"
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "models/pin-decoder-v2.onnx",
+        "vendor/ort-wasm-simd-threaded.mjs",
+        "vendor/ort-wasm-simd-threaded.wasm"
+      ],
+      "matches": [
+        "https://main.gatewa.rs/*"
+      ]
     }
   ]
 }

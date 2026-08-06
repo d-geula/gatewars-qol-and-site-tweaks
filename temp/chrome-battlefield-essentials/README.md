@@ -4,6 +4,7 @@ Minimal Chrome version of the original extension, stripped down to just:
 
 - Battlefield page filters with an injected on-page control bar
 - Referer header override for requests to `https://main.gatewa.rs/*`
+- Local ONNX PIN decoding and login-field autofill
 
 ## Included Features
 
@@ -16,7 +17,16 @@ The content script injects a small filter bar on battlefield pages with:
 - `Army >=`
 - `Hide no-attack`
 
-This version intentionally removes the scanner, popup-based battlefield settings, login autofill, site tweaks, and other non-essential features.
+This version intentionally removes the scanner, popup-based battlefield
+settings, and other non-essential features.
+
+### Login PIN autofill
+
+On the Main login page, the extension watches for the login modal, decodes its
+PIN GIF locally with the bundled V2 ONNX model, and fills `input#PIN`. It does
+not submit the form, apply a confidence threshold, store predictions, or send
+the image anywhere. Reopening the modal or loading a new PIN triggers decoding
+again.
 
 ### Referer override
 
@@ -59,5 +69,7 @@ Load this folder in Chrome:
 
 - `manifest.json`: Chrome Manifest V3 definition
 - `content.js`: on-page battlefield filter UI and row filtering
+- `pin-autofill.js`: browser preprocessing, ONNX inference, and PIN field fill
+- `models/` and `vendor/`: generated model and ONNX Runtime Web assets
 - `service-worker.js`: referer override rule management
 - `popup.html` and `popup.js`: referer override settings UI
